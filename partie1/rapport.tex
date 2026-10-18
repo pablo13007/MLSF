@@ -1,0 +1,159 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+% Couleurs des régions (figure 1)
+\definecolor{c1}{HTML}{F4C7C3}\definecolor{c2}{HTML}{C9E4C5}
+\definecolor{c3}{HTML}{C6DBF0}\definecolor{c4}{HTML}{FBE3B0}
+\definecolor{c5}{HTML}{DCCCEC}\definecolor{c6}{HTML}{BFE6E3}
+\definecolor{c7}{HTML}{F2D0E4}\definecolor{c8}{HTML}{E2E2C0}
+
+\newcommand{\x}[2]{x_{#1,#2}}
+
+\title{Projet MLSF -- Un solveur SAT pour Meowdoku\\ \large Partie I}
+\author{Pablo Bosch \and Cécile Chevrière}
+\date{Octobre 2026}
+
+\begin{document}
+\maketitle
+
+\paragraph{Organisation du rendu.} Les programmes se trouvent dans le dossier
+\texttt{Session de travail} : le module \texttt{meowdoku.py} (lecture des grilles, encodage CNF,
+écriture DIMACS, vérification), le module \texttt{generateur.py} (génération de grilles) et le
+notebook \texttt{projet\_partie1.ipynb}, qui exécute les programmes dans l'ordre des questions.
+Les grilles et les fichiers DIMACS produits sont rangés dans \texttt{grilles/} et \texttt{cnf/}.
+
+%======================================================================
+\section{Question 1 -- Modélisation de Meowdoku}
+
+\subsection{Variables}
+
+Pour une grille $N\times M$ découpée en régions $R_1,\dots,R_K$, on introduit une variable
+$\x ij$ par case $(i,j)\in\{1,\dots,N\}\times\{1,\dots,M\}$, interprétée par
+« un chat est placé sur la case $(i,j)$ ». Aucune autre variable n'est introduite.
+Dans le fichier DIMACS, $\x ij$ porte le numéro $(i-1)M+j$, de $1$ à $NM$.
+
+\subsection{Clauses}
+
+Chaque règle du jeu est traduite par une famille de clauses. « Au plus un chat » dans un ensemble
+de cases est exprimé en interdisant chaque paire de chats ; « au moins un chat » par une clause
+unique.
+\begin{align*}
+\text{(1) au plus un chat par ligne :}\quad
+  & \bigwedge_{i=1}^{N}\ \bigwedge_{1\le j<j'\le M} (\neg\x ij\vee\neg\x i{j'})\\
+\text{(2) au plus un chat par colonne :}\quad
+  & \bigwedge_{j=1}^{M}\ \bigwedge_{1\le i<i'\le N} (\neg\x ij\vee\neg\x {i'}j)\\
+\text{(3) exactement un chat par région :}\quad
+  & \bigwedge_{k=1}^{K}\Big(\bigvee_{(i,j)\in R_k}\x ij\Big)\ \wedge
+    \bigwedge_{k=1}^{K}\ \bigwedge_{\substack{c,c'\in R_k\\ c<c'}} (\neg x_c\vee\neg x_{c'})\\
+\text{(4) pas de chats en diagonale :}\quad
+  & \bigwedge_{i=1}^{N-1}\ \bigwedge_{j=1}^{M}\ \bigwedge_{\substack{j'\in\{j-1,j+1\}\\1\le j'\le M}}
+    (\neg\x ij\vee\neg\x{i+1}{j'})
+\end{align*}
+Deux cases voisines au sens du 8-voisinage sont soit sur la même ligne, soit sur la même colonne,
+soit en diagonale : les voisinages horizontal et vertical étant déjà interdits par (1) et (2),
+la famille (4) se limite aux diagonales. Les clauses identiques produites par plusieurs familles
+(par exemple deux cases d'une même région situées sur une même ligne) ne sont écrites qu'une fois.
+
+\paragraph{Correction.} À une valuation $v$ on associe la configuration
+$S_v=\{(i,j)\mid v(\x ij)=1\}$. Chaque famille est exactement la traduction d'une règle :
+$v$ satisfait (1) (resp. (2)) si et seulement si $S_v$ contient au plus un chat par ligne
+(resp. colonne) ; $v$ satisfait (3) si et seulement si chaque région contient au moins et au plus
+un chat de $S_v$ ; enfin, compte tenu de (1) et (2), $v$ satisfait (4) si et seulement si aucun
+couple de chats n'est adjacent. Ainsi $v\models F$ si et seulement si $S_v$ est une solution, et
+$v\mapsto S_v$ est une bijection entre les modèles de $F$ et les solutions de la grille : la
+formule est satisfiable si et seulement si la grille a une solution, et toute valuation témoin
+donne une solution.
+
+\paragraph{Taille de la formule.} Avant suppression des doublons, le nombre de clauses est
+\[
+  N\binom M2 + M\binom N2 + K + \sum_{k=1}^{K}\binom{|R_k|}{2} + 2(N-1)(M-1),
+\]
+soit $O\big(NM(N+M)\big)$ en ordre de grandeur. Le tableau~\ref{tab:tailles} donne les tailles
+obtenues pour les grilles générées (section~\ref{sec:generation}).
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{rrrrrrr}
+    \toprule
+    $N=M=K$   & 4 & 6 & 8 & 10 & 15 & 20\\
+    \midrule
+    variables & 16 & 36 & 64 & 100 & 225 & 400\\
+    clauses   & 74 & 258 & 638 & 1\,253 & 4\,341 & 10\,547\\
+    \bottomrule
+  \end{tabular}
+  \caption{Taille des formules CNF (nombre moyen de clauses sur 3 grilles générées par taille).}
+  \label{tab:tailles}
+\end{table}
+
+\subsection{Implémentation et validation}
+
+La fonction \texttt{lire\_grille} lit un fichier au format imposé et vérifie que les régions
+forment une partition de la grille (régions déclarées, non vides). \texttt{grille\_vers\_cnf}
+construit la liste des clauses, \texttt{ecrire\_dimacs} écrit le fichier, et \texttt{convertir}
+enchaîne les trois (aussi utilisable en ligne de commande :
+\texttt{python meowdoku.py grille.txt sortie.cnf}). Pour la grille de la figure~1 de l'énoncé,
+on obtient 36 variables et 309 clauses.
+
+La fonction \texttt{verifier\_solution} contrôle directement les quatre règles du jeu sur une
+configuration de chats, indépendamment de la CNF. Elle a servi à valider l'encodage :
+\begin{itemize}
+  \item la solution de la figure~2 de l'énoncé est licite et satisfait la CNF ;
+  \item sur cinq grilles $4\times4$, pour chacune des $2^{16}$ valuations, « la valuation satisfait
+        la CNF » et « la configuration associée est licite » coïncident ;
+  \item sur des grilles $6\times6$ et $7\times7$, où l'énumération complète est hors de portée,
+        il y a également accord sur toutes les permutations (un chat par ligne et par colonne)
+        et sur $20\,000$ valuations aléatoires.
+\end{itemize}
+
+\subsection{Génération de grilles}\label{sec:generation}
+
+On se restreint au cas $N=M=K$. Pour garantir l'existence d'une solution, on construit
+\emph{d'abord} une solution, \emph{puis} les régions autour d'elle.
+
+\paragraph{Étape 1 : placement des chats.} Avec $N=M=K$, une solution place exactement un chat
+par ligne et par colonne : c'est une permutation $\sigma$ (chat en $(i,\sigma(i))$). Les chats de
+deux lignes consécutives ne doivent pas être adjacents, d'où la contrainte
+$|\sigma(i+1)-\sigma(i)|\ge2$. On place les chats ligne par ligne : pour chaque ligne, on essaie les
+colonnes libres compatibles avec le chat de la ligne précédente, dans un ordre aléatoire ; si
+aucune ne convient, on revient sur la ligne précédente pour y essayer la colonne suivante. Le
+procédé trouve un placement dès qu'il en existe un. Il n'en existe pas pour $N=2$ (deux chats
+d'une grille $2\times2$ sont toujours adjacents) ni pour $N=3$ (le chat de la ligne 2 devrait être
+en colonne 1 ou 3, et ceux des lignes 1 et 3 tous deux dans la colonne opposée) ; le générateur
+s'utilise donc pour $N=1$ ou $N\ge4$.
+
+\paragraph{Étape 2 : croissance des régions.} Chaque chat est le germe d'une région. Tant qu'il
+reste des cases libres, on choisit une région au hasard et on lui ajoute une case libre voisine
+(haut, bas, gauche ou droite) de l'une de ses cases. Comme la grille est connexe, toutes les cases
+finissent par être attribuées.
+
+\paragraph{Garantie.} Chaque case appartient à exactement une région, et chaque région est
+connexe et contient exactement un chat, son germe. Les régions forment donc une partition de la
+grille en $K=N$ régions non vides, et le placement de l'étape 1 respecte les quatre règles : la
+grille obtenue possède au moins une solution. Cette solution est écrite en commentaire dans le
+fichier de la grille et une graine rend chaque génération reproductible
+(\texttt{python generateur.py N graine sortie.txt}). Pour les 51 grilles générées
+($N=4,\dots,20$, trois graines par taille), \texttt{verifier\_solution} confirme que la solution
+construite est licite.
+
+\begin{figure}[h]
+  \centering
+  \input{figures/grille_8x8.tex}
+  \caption{Génération d'une grille $8\times8$ : placement des chats (gauche), puis croissance des
+  régions autour de chaque chat (droite).}
+\end{figure}
+
+%======================================================================
+\section*{Usage des assistants IA}
+Un assistant IA (Claude) a été utilisé pour proposer la démarche et une première version du code
+et du rapport, que nous avons relus, testés et repris.
+
+\end{document}
