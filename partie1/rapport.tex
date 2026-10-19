@@ -27,7 +27,8 @@
 
 \paragraph{Organisation du rendu.} Les programmes se trouvent dans le dossier
 \texttt{Session de travail} : le module \texttt{meowdoku.py} (lecture des grilles, encodage CNF,
-écriture DIMACS, vérification), le module \texttt{generateur.py} (génération de grilles) et le
+écriture DIMACS, vérification), le module \texttt{generateur.py} (génération de grilles), le module
+\texttt{dpll.py} (lecture DIMACS, algorithmes DPLL 1 et 2) et le
 notebook \texttt{projet\_partie1.ipynb}, qui exécute les programmes dans l'ordre des questions.
 Les grilles et les fichiers DIMACS produits sont rangés dans \texttt{grilles/} et \texttt{cnf/}.
 
@@ -150,6 +151,162 @@ construite est licite.
   \caption{Génération d'une grille $8\times8$ : placement des chats (gauche), puis croissance des
   régions autour de chaque chat (droite).}
 \end{figure}
+
+%======================================================================
+\section{Question 2 -- Solveur DPLL}
+
+Le code de cette question est dans le module \texttt{dpll.py} ; la partie 2 du notebook l'exécute.
+
+\subsection{Représentation des formules et lecture DIMACS}
+
+On reprend directement les conventions du format DIMACS :
+\begin{itemize}
+  \item un \emph{littéral} est un entier non nul, $k$ pour $x_k$ et $-k$ pour $\neg x_k$ ;
+        l'opposé d'un littéral $l$ est donc simplement $-l$ ;
+  \item une \emph{clause} est une liste de littéraux, une \emph{formule} une liste de clauses ;
+        la formule vide (aucune clause) est vraie et la clause vide $\square$ est fausse ;
+  \item une \emph{valuation} est un dictionnaire \texttt{variable} $\mapsto$ \texttt{bool}.
+\end{itemize}
+Ces structures natives de Python ne demandent aucune conversion à la lecture et rendent les
+opérations de l'algorithme très courtes.
+
+La fonction \texttt{lire\_dimacs} renvoie le couple (nombre de variables, clauses). Elle ignore
+les commentaires, exige l'en-tête \texttt{p cnf} avant la première clause, découpe les clauses sur
+les \texttt{0} (une clause peut donc s'étendre sur plusieurs lignes, et une ligne réduite à
+\texttt{0} donne la clause vide), refuse les variables dont le numéro dépasse celui de l'en-tête,
+et s'arrête au marqueur \texttt{\%} qui termine certains fichiers de la bibliothèque SATLIB.
+La fonction \texttt{nettoyer} retire ensuite les littéraux répétés (\texttt{1 1 0} devient la
+clause $x_1$) et les tautologies (clauses contenant $p$ et $\neg p$, toujours vraies). Ces deux
+transformations préservent l'ensemble des modèles ; la seconde est nécessaire pour que la règle
+du littéral pur soit correcte, et la première pour qu'une clause \texttt{1 1} soit bien reconnue
+comme unitaire.
+
+\subsection{Algorithmes 1 et 2}
+
+Les deux algorithmes sont écrits de façon fidèle à l'énoncé, à l'aide de quelques fonctions
+auxiliaires :
+\begin{itemize}
+  \item \texttt{simplifier(F, l)} calcule $F[l\leftarrow1]$ : les clauses contenant $l$ sont
+        retirées et $\neg l$ est supprimé des autres. Comme $F[p\leftarrow b]=F[l\leftarrow1]$
+        avec $l=p$ si $b=1$ et $l=\neg p$ sinon (fonction \texttt{litteral(p, b)}), cette seule
+        opération suffit pour les trois règles ;
+  \item \texttt{clause\_unitaire(F)} et \texttt{litteral\_pur(F)} renvoient un littéral à
+        affecter, ou \texttt{None} ;
+  \item \texttt{random\_choice(F, rng)} tire au hasard une variable présente dans $F$ et une
+        valeur de vérité. Le générateur aléatoire est passé en paramètre afin de rendre chaque
+        exécution reproductible (option \texttt{-{}-graine}).
+\end{itemize}
+
+\paragraph{Algorithme 1} (\texttt{dpll\_statut}). Il renvoie seulement \texttt{True} (SAT) ou
+\texttt{False} (UNSAT) et suit les lignes 1 à 13 : clause vide, formule vide, clause unitaire,
+littéral pur, puis décision aléatoire avec retour arrière sur la valeur opposée.
+
+\paragraph{Algorithme 2} (\texttt{dpll}). Il renvoie \texttt{(True, v)} ou \texttt{(False, None)}.
+La valuation est construite \emph{en remontant} les appels récursifs : chaque niveau ajoute à $v$
+le littéral qu'il a affecté ($v\cup\{l\}$ ou $v\cup\{p\leftarrow b\}$). Les lignes 5--10 et
+11--16 de l'énoncé ayant le même corps, elles sont regroupées : on cherche d'abord une clause
+unitaire, à défaut un littéral pur, puis on fait l'appel récursif. La décision (lignes 17--26)
+est une boucle sur les deux valeurs $b$ puis $\overline b$.
+
+\paragraph{Modèle complet.} La valuation renvoyée ne contient que les variables effectivement
+affectées. Une variable absente a disparu de la formule sans être choisie, parce que toutes ses
+clauses étaient déjà satisfaites : n'importe quelle valeur convient. La fonction
+\texttt{completer} lui donne la valeur faux et produit le modèle au format DIMACS
+$[\pm1,\dots,\pm n]$. La fonction \texttt{verifier\_modele} contrôle enfin que chaque clause
+contient au moins un littéral vrai.
+
+\paragraph{Correction.} Chaque règle préserve la satisfiabilité : une clause unitaire $\{l\}$
+impose $l$ ; si $l$ est pur, tout modèle de $F$ reste un modèle après passage de $l$ à vrai, donc
+$F$ et $F[l\leftarrow1]$ sont équisatisfiables ; la décision explore les deux valeurs. Chaque
+appel récursif affecte une variable, qui disparaît de la formule : la récursion termine, avec une
+profondeur au plus $n+1$ ($n$ variables), d'où la limite de récursion relevée à $100\,000$.
+
+\paragraph{Ligne de commande.} \texttt{python dpll.py fichier.cnf [-{}-algo 1|2] [-{}-graine G]}
+affiche \texttt{s SATISFIABLE} ou \texttt{s UNSATISFIABLE} et, pour l'algorithme 2, la ligne
+\texttt{v \dots\ 0} du modèle, vérifié avant affichage. Le temps de calcul est écrit sur la sortie
+d'erreur, conformément au format qui sera imposé à la question 6.
+
+\subsection{Validation}
+
+\paragraph{Comparaison avec la force brute.} Sur 500 formules aléatoires (1 à 8 variables, 0 à 30
+clauses de 1 à 3 littéraux, avec littéraux répétés et tautologies possibles), le statut renvoyé
+par les deux algorithmes coïncide toujours avec celui obtenu par énumération des $2^n$ valuations,
+et chaque modèle renvoyé par l'algorithme 2 est vérifié (154 formules SAT, 346 UNSAT).
+
+\paragraph{Instances des enseignants.} Les 41 fichiers du dossier \texttt{public-instances}
+ont été lancés avec les deux algorithmes, chacun dans un processus séparé avec la limite de
+60~s de la compétition ; le statut est comparé à \texttt{expected.json} et les modèles sont
+vérifiés. Les 11 petites instances (tests d'interface \texttt{smoke}, \texttt{unit},
+\texttt{cli} et cas limites \texttt{edge} : formule vide, formule sans clause, clause vide,
+tautologie, littéraux répétés, littéraux tous négatifs) sont toutes correctement résolues. Le
+tableau~\ref{tab:public} donne les résultats sur les 30 instances de référence.
+
+\begin{table}[h]
+  \centering\small\setlength{\tabcolsep}{4pt}
+  \begin{tabular}{lrrcrr@{\qquad}lrrcrr}
+    \toprule
+    instance & var. & clauses & attendu & algo 1 & algo 2 &
+    instance & var. & clauses & attendu & algo 1 & algo 2\\
+    \midrule
+    01 &   48 &    261 & SAT   &  0,10 &  0,10 & 16 &   42 &    133 & UNSAT &  0,21 &  0,20\\
+    02 &   90 &    300 & SAT   &  0,09 &  0,09 & 17 &  100 &    850 & SAT   &  1,47 &  1,42\\
+    03 &   63 &    168 & UNSAT &    -- &    -- & 18 &  459 &  7\,054 & SAT   & 16,99 & 17,25\\
+    04 &  180 &    800 & SAT   &  0,12 &  0,12 & 19 &  729 & 22\,060 & SAT   & 21,67 & 21,55\\
+    05 &   50 &    218 & UNSAT &  0,58 &  0,56 & 20 &   50 &    218 & SAT   &  1,46 &  0,93\\
+    06 & 1\,363 & 3\,034 & SAT &    -- &    -- & 21 &  510 &  3\,065 & SAT   &  0,82 &  0,82\\
+    07 &  225 &  1\,280 & SAT   &  1,15 &  1,13 & 22 &  100 &    850 & UNSAT &  8,79 &  8,48\\
+    08 &  100 &    900 & UNSAT &  2,73 &  2,80 & 23 &  350 &  1\,149 & SAT   &  0,31 &  0,31\\
+    09 &   50 &    218 & SAT   &  0,12 &  0,12 & 24 &   50 &    218 & UNSAT &  0,65 &  0,66\\
+    10 &   50 &    218 & UNSAT &  0,80 &  0,80 & 25 &   50 &    218 & UNSAT &  0,78 &  0,79\\
+    11 &  729 & 21\,844 & SAT   & 10,75 & 11,27 & 26 &  100 &    800 & SAT   &  0,12 &  0,12\\
+    12 &  522 & 11\,636 & SAT   &    -- &    -- & 27 &  181 &  3\,151 & SAT   &    -- &    --\\
+    13 &   61 &    581 & SAT   &  1,07 &  1,07 & 28 &   50 &    218 & UNSAT &  0,56 &  0,56\\
+    14 &   68 &    270 & SAT   &  0,13 &  0,13 & 29 &  150 &    545 & SAT   &  0,47 &  0,44\\
+    15 &  100 &    850 & UNSAT &  4,09 &  3,86 & 30 &  100 &    850 & UNSAT & 11,36 & 11,54\\
+    \bottomrule
+  \end{tabular}
+  \caption{Instances \texttt{public-01} à \texttt{public-30} : temps d'exécution en secondes
+  (processus complet, démarrage de Python compris, graine 0), « -- » = dépassement des 60~s.
+  Toutes les réponses obtenues sont correctes et tous les modèles sont vérifiés.}
+  \label{tab:public}
+\end{table}
+
+\paragraph{Grilles Meowdoku.} Sur les grilles générées à la question 1 ($N=4,6,8,10,12$),
+l'algorithme 2 trouve une valuation en moins de $0{,}1$~s ; la configuration de chats associée
+est validée par \texttt{verifier\_solution}.
+
+\subsection{Performances}
+
+\paragraph{Bilan.} Les deux algorithmes ne donnent jamais de réponse fausse : 37 instances sur
+41 sont résolues dans la limite de temps, les 4 autres (\texttt{public-03}, \texttt{06},
+\texttt{12}, \texttt{27}) dépassent les 60~s. Sur les petites instances, le temps mesuré
+($\approx0{,}1$~s) est essentiellement celui du démarrage de l'interpréteur.
+
+\paragraph{Algorithme 1 contre algorithme 2.} Les temps sont presque identiques : avec la même
+graine, les deux algorithmes font exactement les mêmes choix et explorent le même arbre ; la
+construction de la valuation ne coûte qu'une affectation de dictionnaire par appel récursif
+réussi, négligeable devant la simplification de la formule. Les petits écarts observés
+(par exemple \texttt{public-20}) viennent du bruit de mesure, les instances étant lancées quatre
+par quatre en parallèle.
+
+\paragraph{Coût d'un appel.} Soit $|F|$ la taille de la formule (somme des longueurs des
+clauses). Chaque appel récursif coûte $O(|F|)$ pour \texttt{simplifier}, qui recopie la formule,
+$O(|F|)$ pour chercher une clause unitaire, et $O(|F|+n\log n)$ pour chercher un littéral pur
+(ensemble des littéraux puis tri). Comme chaque propagation unitaire ou élimination de littéral
+pur est un appel récursif complet, propager une chaîne de $m$ clauses unitaires coûte
+$O(m\,|F|)$. La mémoire est en $O(n\,|F|)$ dans le pire cas, puisque chaque niveau de la pile
+garde sa copie de la formule.
+
+\paragraph{Nombre d'appels.} Dans le pire cas, l'arbre de recherche a $2^n$ feuilles. Le choix
+aléatoire de la variable de décision ne tient aucun compte de la structure de la formule : sur les
+instances UNSAT, qui obligent à parcourir tout l'arbre, et sur les grandes instances structurées
+(\texttt{public-06} : 1\,363 variables ; \texttt{public-12} : 11\,636 clauses), le nombre de décisions explose. Les grilles Meowdoku sont au
+contraire faciles : dès qu'un chat est placé, les clauses binaires « au plus un » propagent
+immédiatement l'interdiction de toute sa ligne, sa colonne, sa région et son voisinage.
+
+Ces mesures fixent les deux axes d'amélioration traités dans la suite : réduire le nombre de
+décisions par une heuristique de branchement (questions 4 et 5), et réduire le coût d'un appel
+en évitant de recopier la formule à chaque étape (question 6).
 
 %======================================================================
 \section*{Usage des assistants IA}
