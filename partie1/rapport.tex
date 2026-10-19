@@ -28,9 +28,11 @@
 \paragraph{Organisation du rendu.} Les programmes se trouvent dans le dossier
 \texttt{Session de travail} : le module \texttt{meowdoku.py} (lecture des grilles, encodage CNF,
 écriture DIMACS, vérification), le module \texttt{generateur.py} (génération de grilles), le module
-\texttt{dpll.py} (lecture DIMACS, algorithmes DPLL 1 et 2) et le
+\texttt{dpll.py} (lecture DIMACS, algorithmes DPLL 1 et 2), le programme \texttt{resoudre.py}
+(résolution d'une grille) et le
 notebook \texttt{projet\_partie1.ipynb}, qui exécute les programmes dans l'ordre des questions.
-Les grilles et les fichiers DIMACS produits sont rangés dans \texttt{grilles/} et \texttt{cnf/}.
+Les grilles et les fichiers DIMACS produits sont rangés dans \texttt{grilles/} et \texttt{cnf/},
+les fichiers solutions dans \texttt{solutions/}.
 
 %======================================================================
 \section{Question 1 -- Modélisation de Meowdoku}
@@ -307,6 +309,101 @@ immédiatement l'interdiction de toute sa ligne, sa colonne, sa région et son v
 Ces mesures fixent les deux axes d'amélioration traités dans la suite : réduire le nombre de
 décisions par une heuristique de branchement (questions 4 et 5), et réduire le coût d'un appel
 en évitant de recopier la formule à chaque étape (question 6).
+
+%======================================================================
+\section{Question 3 -- Résolution d'une grille Meowdoku}
+
+Le programme \texttt{resoudre.py} prend un fichier grille et produit un fichier solution :
+\begin{center}
+\texttt{python resoudre.py grille.txt solution.txt [-{}-cnf fichier.cnf] [-{}-graine G]}
+\end{center}
+
+\subsection{Étapes}
+
+La fonction \texttt{resoudre} enchaîne les programmes des deux questions précédentes.
+\begin{enumerate}
+  \item \textbf{Lecture et conversion} (question 1) : la grille est lue et contrôlée par
+        \texttt{lire\_grille}, puis convertie en fichier DIMACS par \texttt{grille\_vers\_cnf} et
+        \texttt{ecrire\_dimacs} (la grille n'est lue qu'une fois). Ce fichier
+        est conservé (par défaut à côté du fichier solution, avec l'extension \texttt{.cnf}).
+  \item \textbf{Résolution} (question 2) : le fichier DIMACS est relu par \texttt{lire\_dimacs}
+        et la formule est passée à l'algorithme 2 (\texttt{dpll}), qui fournit une valuation
+        témoin. La recherche de solution est ainsi entièrement déléguée au solveur, à travers le
+        format DIMACS, comme demandé. La graine (0 par défaut) rend le résultat reproductible.
+  \item \textbf{Décodage} : les variables vraies de la valuation sont traduites en cases par
+        \texttt{chats\_depuis\_valuation}, en inversant la numérotation $\x ij\mapsto(i-1)M+j$
+        de la question 1. Par la bijection établie à la question 1, ces cases forment une
+        solution de la grille.
+  \item \textbf{Écriture} (\texttt{ecrire\_solution}) au format de la figure 2 de l'énoncé :
+        copie à l'identique du fichier d'entrée, puis une ligne \og région ligne colonne\fg{} par
+        région, dans l'ordre de la ligne \texttt{ZONES}, puis la grille où les chats sont marqués
+        par \texttt{*} et les autres cases par \texttt{.}.
+  \item \textbf{Vérification} : le fichier solution écrit est relu (\texttt{lire\_solution}) et
+        l'on contrôle que le dictionnaire donne un chat par région déclarée, que chaque chat est
+        bien dans la région annoncée, que le dictionnaire et la grille de \texttt{*} désignent les
+        mêmes cases, et enfin que cette configuration respecte les quatre règles du jeu
+        (\texttt{verifier\_solution} de la question 1, indépendante de la CNF). En cas d'échec, le
+        programme s'arrête avec un message d'erreur.
+\end{enumerate}
+La vérification porte sur le fichier produit et non sur la valuation : elle contrôle ainsi
+l'ensemble de la chaîne, y compris le décodage et l'écriture. Une grille sans solution, exclue par
+l'énoncé, provoquerait une réponse UNSAT du solveur et un message d'erreur.
+
+\subsection{Résultats}
+
+Pour la grille de la figure 1 de l'énoncé, le fichier produit est identique à celui de la
+figure 2 :
+\begin{center}
+\begin{minipage}{0.3\textwidth}\small
+\begin{verbatim}
+A 3 2
+B 2 5
+C 1 3
+D 5 6
+E 4 4
+F 6 1
+\end{verbatim}
+\end{minipage}
+\begin{minipage}{0.3\textwidth}\small
+\begin{verbatim}
+. . * . . .
+. . . . * .
+. * . . . .
+. . . * . .
+. . . . . *
+* . . . . .
+\end{verbatim}
+\end{minipage}
+\end{center}
+
+Le programme a ensuite été lancé sur les 51 grilles générées à la question 1, avec la limite de
+60~s par grille (tableau~\ref{tab:q3}). Toutes les solutions écrites passent la vérification.
+Pour certaines grilles, la solution trouvée diffère de celle construite par le générateur : ces
+grilles ont plusieurs solutions.
+
+\begin{table}[h]
+  \centering\small
+  \begin{tabular}{rrrr@{\qquad}rrrr}
+    \toprule
+    $N$ & graine 0 & graine 1 & graine 2 & $N$ & graine 0 & graine 1 & graine 2\\
+    \midrule
+    4--12 & \multicolumn{3}{c}{$< 2$ (toutes)} & 17 & 1,10 & 3,13 & 0,86\\
+    13 & 0,43 & 9,92 & 0,51  & 18 & 22,63 & 1,16 & 28,56\\
+    14 & 0,61 & 0,49 & 0,44  & 19 & 44,61 & 3,14 & --\\
+    15 & 0,97 & 0,52 & 0,83  & 20 & 1,68 & 2,17 & --\\
+    16 & --   & 6,54 & 1,57  &    &      &      &   \\
+    \bottomrule
+  \end{tabular}
+  \caption{Résolution des grilles générées : temps en secondes (processus complet, démarrage de
+  Python compris), « -- » = dépassement des 60~s.}
+  \label{tab:q3}
+\end{table}
+
+Jusqu'à $N=15$, toutes les grilles sont résolues en moins de 10~s, le plus souvent en moins d'une
+seconde. Au-delà, le temps devient très variable d'une grille à l'autre, et 3 grilles sur 51
+($N=16$, $19$ et $20$) dépassent les 60~s : le solveur utilisé est le DPLL de base de la
+question 2, qui choisit au hasard la variable de branchement et sa valeur. L'amélioration de ces
+temps fait l'objet des questions 4 à 6.
 
 %======================================================================
 \section*{Usage des assistants IA}
