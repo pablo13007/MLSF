@@ -102,8 +102,7 @@ obtenues pour les grilles générées (section~\ref{sec:generation}).
 La fonction \texttt{lire\_grille} lit un fichier au format imposé et vérifie que les régions
 forment une partition de la grille (régions déclarées, non vides). \texttt{grille\_vers\_cnf}
 construit la liste des clauses, \texttt{ecrire\_dimacs} écrit le fichier, et \texttt{convertir}
-enchaîne les trois (aussi utilisable en ligne de commande :
-\texttt{python meowdoku.py grille.txt sortie.cnf}). Pour la grille de la figure~1 de l'énoncé,
+enchaîne les trois. Pour la grille de la figure~1 de l'énoncé,
 on obtient 36 variables et 309 clauses.
 
 La fonction \texttt{verifier\_solution} contrôle directement les quatre règles du jeu sur une
@@ -112,9 +111,6 @@ configuration de chats, indépendamment de la CNF. Elle a servi à valider l'enc
   \item la solution de la figure~2 de l'énoncé est licite et satisfait la CNF ;
   \item sur cinq grilles $4\times4$, pour chacune des $2^{16}$ valuations, « la valuation satisfait
         la CNF » et « la configuration associée est licite » coïncident ;
-  \item sur des grilles $6\times6$ et $7\times7$, où l'énumération complète est hors de portée,
-        il y a également accord sur toutes les permutations (un chat par ligne et par colonne)
-        et sur $20\,000$ valuations aléatoires.
 \end{itemize}
 
 \subsection{Génération de grilles}\label{sec:generation}
