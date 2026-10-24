@@ -246,21 +246,21 @@ tableau~\ref{tab:public} donne les résultats sur les 30 instances de référenc
     instance & var. & clauses & attendu & algo 1 & algo 2 &
     instance & var. & clauses & attendu & algo 1 & algo 2\\
     \midrule
-    01 &   48 &    261 & SAT   &  0,10 &  0,10 & 16 &   42 &    133 & UNSAT &  0,21 &  0,20\\
-    02 &   90 &    300 & SAT   &  0,09 &  0,09 & 17 &  100 &    850 & SAT   &  1,47 &  1,42\\
-    03 &   63 &    168 & UNSAT &    -- &    -- & 18 &  459 &  7\,054 & SAT   & 16,99 & 17,25\\
-    04 &  180 &    800 & SAT   &  0,12 &  0,12 & 19 &  729 & 22\,060 & SAT   & 21,67 & 21,55\\
-    05 &   50 &    218 & UNSAT &  0,58 &  0,56 & 20 &   50 &    218 & SAT   &  1,46 &  0,93\\
-    06 & 1\,363 & 3\,034 & SAT &    -- &    -- & 21 &  510 &  3\,065 & SAT   &  0,82 &  0,82\\
-    07 &  225 &  1\,280 & SAT   &  1,15 &  1,13 & 22 &  100 &    850 & UNSAT &  8,79 &  8,48\\
-    08 &  100 &    900 & UNSAT &  2,73 &  2,80 & 23 &  350 &  1\,149 & SAT   &  0,31 &  0,31\\
-    09 &   50 &    218 & SAT   &  0,12 &  0,12 & 24 &   50 &    218 & UNSAT &  0,65 &  0,66\\
-    10 &   50 &    218 & UNSAT &  0,80 &  0,80 & 25 &   50 &    218 & UNSAT &  0,78 &  0,79\\
-    11 &  729 & 21\,844 & SAT   & 10,75 & 11,27 & 26 &  100 &    800 & SAT   &  0,12 &  0,12\\
+    01 &   48 &    261 & SAT   &  0,04 &  0,04 & 16 &   42 &    133 & UNSAT &  0,15 &  0,14\\
+    02 &   90 &    300 & SAT   &  0,05 &  0,06 & 17 &  100 &    850 & SAT   &  0,96 &  0,97\\
+    03 &   63 &    168 & UNSAT &    -- &    -- & 18 &  459 &  7\,054 & SAT   &  7,60 &  7,53\\
+    04 &  180 &    800 & SAT   &  0,10 &  0,09 & 19 &  729 & 22\,060 & SAT   &  4,80 &  4,80\\
+    05 &   50 &    218 & UNSAT &  0,52 &  0,53 & 20 &   50 &    218 & SAT   &  0,23 &  0,22\\
+    06 & 1\,363 & 3\,034 & SAT &    -- &    -- & 21 &  510 &  3\,065 & SAT   &  0,42 &  0,42\\
+    07 &  225 &  1\,280 & SAT   &  0,13 &  0,13 & 22 &  100 &    850 & UNSAT &  4,86 &  4,96\\
+    08 &  100 &    900 & UNSAT &  1,67 &  1,70 & 23 &  350 &  1\,149 & SAT   &  0,17 &  0,16\\
+    09 &   50 &    218 & SAT   &  0,08 &  0,07 & 24 &   50 &    218 & UNSAT &  0,40 &  0,39\\
+    10 &   50 &    218 & UNSAT &  0,45 &  0,46 & 25 &   50 &    218 & UNSAT &  0,47 &  0,46\\
+    11 &  729 & 21\,844 & SAT   &  4,39 &  4,38 & 26 &  100 &    800 & SAT   &  0,09 &  0,08\\
     12 &  522 & 11\,636 & SAT   &    -- &    -- & 27 &  181 &  3\,151 & SAT   &    -- &    --\\
-    13 &   61 &    581 & SAT   &  1,07 &  1,07 & 28 &   50 &    218 & UNSAT &  0,56 &  0,56\\
-    14 &   68 &    270 & SAT   &  0,13 &  0,13 & 29 &  150 &    545 & SAT   &  0,47 &  0,44\\
-    15 &  100 &    850 & UNSAT &  4,09 &  3,86 & 30 &  100 &    850 & UNSAT & 11,36 & 11,54\\
+    13 &   61 &    581 & SAT   &  0,59 &  0,58 & 28 &   50 &    218 & UNSAT &  0,26 &  0,26\\
+    14 &   68 &    270 & SAT   &  0,06 &  0,07 & 29 &  150 &    545 & SAT   &  0,23 &  0,22\\
+    15 &  100 &    850 & UNSAT &  2,70 &  2,70 & 30 &  100 &    850 & UNSAT &  6,82 &  6,94\\
     \bottomrule
   \end{tabular}
   \caption{Instances \texttt{public-01} à \texttt{public-30} : temps d'exécution en secondes
@@ -278,14 +278,16 @@ est validée par \texttt{verifier\_solution}.
 \paragraph{Bilan.} Les deux algorithmes ne donnent jamais de réponse fausse : 37 instances sur
 41 sont résolues dans la limite de temps, les 4 autres (\texttt{public-03}, \texttt{06},
 \texttt{12}, \texttt{27}) dépassent les 60~s. Sur les petites instances, le temps mesuré
-($\approx0{,}1$~s) est essentiellement celui du démarrage de l'interpréteur.
+($\approx0{,}05$~s) est essentiellement celui du démarrage de l'interpréteur.
 
 \paragraph{Algorithme 1 contre algorithme 2.} Les temps sont presque identiques : avec la même
 graine, les deux algorithmes font exactement les mêmes choix et explorent le même arbre ; la
 construction de la valuation ne coûte qu'une affectation de dictionnaire par appel récursif
 réussi, négligeable devant la simplification de la formule. Les petits écarts observés
-(par exemple \texttt{public-20}) viennent du bruit de mesure, les instances étant lancées quatre
-par quatre en parallèle.
+(par exemple 4,86 et 4,96~s sur \texttt{public-22}) viennent du bruit de mesure, les instances
+étant lancées quatre par quatre en parallèle. Pour la même raison, les temps absolus varient d'une
+exécution à l'autre selon la charge de la machine ; seuls les ordres de grandeur sont
+significatifs.
 
 \paragraph{Coût d'un appel.} Soit $|F|$ la taille de la formule (somme des longueurs des
 clauses). Chaque appel récursif coûte $O(|F|)$ pour \texttt{simplifier}, qui recopie la formule,
@@ -383,11 +385,11 @@ grilles ont plusieurs solutions.
     \toprule
     $N$ & graine 0 & graine 1 & graine 2 & $N$ & graine 0 & graine 1 & graine 2\\
     \midrule
-    4--12 & \multicolumn{3}{c}{$< 2$ (toutes)} & 17 & 1,10 & 3,13 & 0,86\\
-    13 & 0,43 & 9,92 & 0,51  & 18 & 22,63 & 1,16 & 28,56\\
-    14 & 0,61 & 0,49 & 0,44  & 19 & 44,61 & 3,14 & --\\
-    15 & 0,97 & 0,52 & 0,83  & 20 & 1,68 & 2,17 & --\\
-    16 & --   & 6,54 & 1,57  &    &      &      &   \\
+    4--12 & \multicolumn{3}{c}{$< 0{,}2$ (toutes)} & 17 & 0,57 & 1,49 & 0,51\\
+    13 & 0,16 & 4,75 & 0,16  & 18 & 12,51 & 0,67 & 16,12\\
+    14 & 0,23 & 0,25 & 0,24  & 19 & 23,05 & 1,24 & --\\
+    15 & 0,56 & 0,29 & 0,42  & 20 & 0,99 & 1,01 & 57,93\\
+    16 & 48,62 & 2,99 & 0,67 &    &      &      &   \\
     \bottomrule
   \end{tabular}
   \caption{Résolution des grilles générées : temps en secondes (processus complet, démarrage de
@@ -395,15 +397,149 @@ grilles ont plusieurs solutions.
   \label{tab:q3}
 \end{table}
 
-Jusqu'à $N=15$, toutes les grilles sont résolues en moins de 10~s, le plus souvent en moins d'une
-seconde. Au-delà, le temps devient très variable d'une grille à l'autre, et 3 grilles sur 51
-($N=16$, $19$ et $20$) dépassent les 60~s : le solveur utilisé est le DPLL de base de la
+Jusqu'à $N=15$, toutes les grilles sont résolues en moins de 5~s, le plus souvent en moins d'une
+seconde. Au-delà, le temps devient très variable d'une grille à l'autre : une grille sur 51
+(\texttt{meow\_19\_2}) dépasse les 60~s et deux autres s'en approchent (\texttt{meow\_16\_0} :
+48,6~s ; \texttt{meow\_20\_2} : 57,9~s), si bien que le nombre de grilles résolues peut varier
+d'une exécution à l'autre selon la charge de la machine : le solveur utilisé est le DPLL de base de la
 question 2, qui choisit au hasard la variable de branchement et sa valeur. L'amélioration de ces
 temps fait l'objet des questions 4 à 6.
 
 %======================================================================
+\section{Question 4 -- Heuristiques de branchement}
+
+Le code de cette question est dans le module \texttt{heuristiques.py} ; la partie 4 du notebook
+l'exécute.
+
+\subsection{Algorithme 3}
+
+La fonction \texttt{dpll\_h(F, choix)} reprend exactement l'algorithme 2 (\texttt{dpll}) et les
+mêmes fonctions auxiliaires (\texttt{simplifier}, \texttt{clause\_unitaire},
+\texttt{litteral\_pur}) ; seule la ligne 17 change : la décision $(p,b)$ est donnée par
+\texttt{choix(F)} au lieu de \texttt{random\_choice}. Une heuristique est donc simplement une
+fonction qui reçoit la formule courante et renvoie une variable et une valeur de vérité.
+
+\subsection{Choix des heuristiques}
+
+Nous avons retenu quatre heuristiques. Elles respectent les contraintes de l'énoncé : $H_3$ sélectionne un littéral, $H_4$ tient compte de la
+taille des clauses, et $H_2$ à $H_4$ sont dynamiques, c'est-à-dire recalculées sur la formule courante à chaque décision (tableau~\ref{tab:heur})
+
+\begin{table}[h]
+  \centering\small
+  \begin{tabular}{lllll}
+    \toprule
+    & & variable $p$ & valeur $b$ & fonction\\
+    \midrule
+    $H_1$ & PVL  & plus petite variable de $F$ & 1 & \texttt{h1\_pvl}\\
+    $H_2$ & VPPM & $\arg\max_p \#(p,F)$ & 1 si $\#^+\ge\#^-$ & \texttt{h2\_vppm}\\
+    $H_3$ & LP   & $|l|$ avec $l=\arg\max_l \mathit{occ}(l,F)$ & 1 si $l=p$, 0 si $l=\neg p$
+          & \texttt{h3\_lp}\\
+    $H_4$ & VFCM & $\arg\max_p \#_k(p,F)$, $k=\min_{C\in F}|C|$ & 1 si $\#_k^+\ge\#_k^-$
+          & \texttt{h4\_vfcm}\\
+    \bottomrule
+  \end{tabular}
+  \caption{Heuristiques implémentées (versions dynamiques) : première variable libre (PVL),
+  variable la plus fréquente avec polarité majoritaire (VPPM), littéral le plus fréquent (LP),
+  variable la plus fréquente dans les clauses de taille minimale (VFCM).}
+  \label{tab:heur}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{$H_1$} ne fait aucun calcul de fréquence : c'est la référence déterministe, qui
+        mesure ce qu'apporte une vraie heuristique par rapport à un ordre arbitraire. Sur les
+        grilles Meowdoku, l'ordre des variables est celui des cases, ligne par ligne, et la
+        valeur 1 revient à poser un chat sur la première case libre.
+  \item \textbf{$H_2$} : une variable fréquente simplifie beaucoup de clauses d'un coup, et la
+        polarité majoritaire satisfait le plus grand nombre de clauses, ce qui augmente les
+        chances de trouver un modèle sans retour arrière sur les instances SAT.
+  \item \textbf{$H_3$} applique la même idée au niveau du littéral : elle choisit le littéral
+        qui satisfait le plus de clauses. Elle diffère de $H_2$ lorsqu'une variable est fréquente
+        mais avec des polarités équilibrées.
+  \item \textbf{$H_4$} (MOMS) privilégie les clauses les plus courtes : ce sont les plus proches
+        de devenir unitaires ; brancher sur leurs variables déclenche la propagation unitaire, ou
+        fait apparaître une clause vide, plus tôt dans l'arbre.
+\end{itemize}
+
+\paragraph{Pourquoi des versions dynamiques ?} Dans notre implémentation, chaque appel récursif
+recopie déjà la formule en $O(|F|)$ (\texttt{simplifier}). Recompter les occurrences à chaque
+décision coûte aussi $O(|F|)$ (plus un tri des variables en $O(n\log n)$) : la version dynamique
+ne change donc pas l'ordre de grandeur du coût d'un appel, alors qu'elle reflète la formule
+réellement restante. Une version statique n'économiserait qu'un facteur constant.
+
+\paragraph{Égalités.} En cas d'ex aequo, on retient la plus petite variable (puis la polarité
+positive pour $H_3$). Le solveur est ainsi entièrement déterministe : il n'a plus besoin de
+graine. Sur la formule d'exemple de l'énoncé,
+$(x_1\vee x_2\vee\neg x_4)\wedge(x_2\vee x_3)\wedge(x_1\vee\neg x_2\vee x_4\vee\neg x_5)$, on
+obtient $x_1\leftarrow1$ pour $H_1$ et $H_3$ ($\mathit{occ}(x_1)=\mathit{occ}(x_2)=2$), et
+$x_2\leftarrow1$ pour $H_2$ ($\#(x_2)=3$) et $H_4$ ($k=2$, clause $x_2\vee x_3$).
+
+\subsection{Validation}
+
+L'énoncé demande que les heuristiques donnent des résultats conformes à l'algorithme 2. Nous
+reprenons les trois tests de la question 2.
+
+\paragraph{Comparaison avec la force brute.} Sur 500 nouvelles formules aléatoires (mêmes
+paramètres qu'à la question 2), les quatre heuristiques renvoient toujours le statut obtenu par
+énumération des $2^n$ valuations, et tous les modèles sont vérifiés (147 SAT, 353 UNSAT).
+
+\paragraph{Instances des enseignants.} Les 41 instances ont été lancées avec chaque heuristique,
+dans les mêmes conditions qu'à la question 2 (processus séparé, limite de 60~s, statut comparé à
+\texttt{expected.json}, modèles vérifiés). \textbf{Aucune réponse n'est fausse.} Les 11 petites
+instances et les instances faciles sont résolues en moins d'une seconde par toutes les
+heuristiques ; le tableau~\ref{tab:q4} donne les instances pour lesquelles au moins un solveur
+dépasse une seconde.
+
+\begin{table}[h]
+  \centering\small
+  \begin{tabular}{lcrrrrr}
+    \toprule
+    instance & attendu & algo 2 (Q2) & $H_1$ & $H_2$ & $H_3$ & $H_4$\\
+    \midrule
+    03 & UNSAT &    -- &    -- &    -- &    -- &    --\\
+    04 & SAT   &  0,09 &  0,23 &    -- & 12,01 &  0,54\\
+    06 & SAT   &    -- &  1,51 &  5,77 &    -- &  1,07\\
+    08 & UNSAT &  1,70 &  0,08 &  0,31 &  0,37 &  0,09\\
+    11 & SAT   &  4,38 &  4,69 &    -- &    -- &  6,70\\
+    12 & SAT   &    -- &    -- & 10,32 &  2,39 & 41,31\\
+    15 & UNSAT &  2,70 &  5,00 &  0,34 &  2,12 &  0,10\\
+    18 & SAT   &  7,53 & 59,15 & 12,97 & 21,15 &  0,78\\
+    19 & SAT   &  4,80 &  6,63 &  4,23 & 17,59 &  3,82\\
+    21 & SAT   &  0,42 &  0,50 &    -- &  0,41 &  0,42\\
+    22 & UNSAT &  4,96 &  1,77 &  0,49 &  0,58 &  0,19\\
+    27 & SAT   &    -- & 18,11 & 39,53 & 27,13 & 29,60\\
+    30 & UNSAT &  6,94 &  3,50 &  0,92 &  1,37 &  0,16\\
+    \midrule
+    \multicolumn{2}{l}{résolues / 41} & 37 & 39 & 37 & 38 & 40\\
+    \bottomrule
+  \end{tabular}
+  \caption{Instances \texttt{public-XX} où au moins un solveur dépasse 1~s : temps en secondes
+  (processus complet), « -- » = dépassement des 60~s. La colonne « algo 2 » reprend le
+  tableau~\ref{tab:public} (même exécution du notebook).}
+  \label{tab:q4}
+\end{table}
+
+\paragraph{Grilles Meowdoku.} Les 51 grilles de la question 1 ont été résolues par chaque
+heuristique à partir de leur fichier DIMACS, avec la même limite ; la valuation est décodée en
+chats puis contrôlée par \texttt{verifier\_solution}. \textbf{Les 51 grilles sont résolues par
+les quatre heuristiques et toutes les solutions sont licites}, contre 50 sur 51 avec
+l'algorithme 2 (tableau~\ref{tab:q3}), dont deux à moins de 12~s de la limite. Le temps reste inférieur à 1,3~s pour toutes les grilles, sauf
+deux : \texttt{meow\_17\_1} pour $H_2$, $H_3$ et $H_4$ (25, 25 et 11~s) et \texttt{meow\_20\_1}
+pour $H_1$ (28~s).
+
+\paragraph{Premiers constats.} Ces mesures servent ici à la validation ; leur analyse détaillée
+(nombre de décisions, de retours arrière, coût des heuristiques) relève de la question 5. On
+note déjà que $H_4$ résout le plus d'instances (40 sur 41, seule \texttt{public-03} résiste) et
+qu'elle est la plus rapide sur les instances UNSAT (\texttt{public-15}, \texttt{22},
+\texttt{30}), où il faut parcourir tout l'arbre : brancher sur les petites clauses provoque
+plus tôt les conflits. À l'inverse, $H_2$ (\texttt{public-04}, \texttt{11}, \texttt{21}) et $H_3$
+(\texttt{public-11}) échouent sur des instances SAT que le tirage aléatoire résout : une
+heuristique déterministe qui se trompe de branche se trompe à chaque fois, alors que le hasard
+peut l'éviter.
+
+%======================================================================
 \section*{Usage des assistants IA}
-Un assistant IA (Claude) a été utilisé pour proposer la démarche et une première version du code
-et du rapport, que nous avons relus, testés et repris.
+Pour chaque question, nous avons d'abord défini notre stratégie de résolution. Nous avons ensuite
+utilisé Claude (Opus 5.5, effort moyen) pour générer une première version du code et du rapport,
+que nous avons relus, testés et repris.
 
 \end{document}
