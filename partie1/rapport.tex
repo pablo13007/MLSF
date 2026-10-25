@@ -6,6 +6,7 @@
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
+\usepackage{graphicx}
 \usepackage{tikz}
 \usepackage{xcolor}
 \usepackage[hidelinks]{hyperref}
@@ -29,7 +30,8 @@
 \texttt{Session de travail} : le module \texttt{meowdoku.py} (lecture des grilles, encodage CNF,
 écriture DIMACS, vérification), le module \texttt{generateur.py} (génération de grilles), le module
 \texttt{dpll.py} (lecture DIMACS, algorithmes DPLL 1 et 2), le programme \texttt{resoudre.py}
-(résolution d'une grille) et le
+(résolution d'une grille), le module \texttt{heuristiques.py} (DPLL avec heuristiques), le
+module \texttt{mesures.py} (instrumentation) et le
 notebook \texttt{projet\_partie1.ipynb}, qui exécute les programmes dans l'ordre des questions.
 Les grilles et les fichiers DIMACS produits sont rangés dans \texttt{grilles/} et \texttt{cnf/},
 les fichiers solutions dans \texttt{solutions/}.
@@ -535,6 +537,206 @@ plus tôt les conflits. À l'inverse, $H_2$ (\texttt{public-04}, \texttt{11}, \t
 (\texttt{public-11}) échouent sur des instances SAT que le tirage aléatoire résout : une
 heuristique déterministe qui se trompe de branche se trompe à chaque fois, alors que le hasard
 peut l'éviter.
+
+%======================================================================
+\section{Question 5 -- Analyse des performances}
+
+Le code de cette question est dans le module \texttt{mesures.py} ; la partie 5 du notebook
+l'exécute. Les mesures brutes sont enregistrées dans \texttt{resultats\_q5.json}.
+
+\subsection{Instrumentation}
+
+La fonction \texttt{dpll\_mesure(F, choix, m)} est une copie de \texttt{dpll\_h} qui met à jour
+un objet de compteurs \texttt{m} : nombre de \textbf{décisions} (ligne 17), de \textbf{retours
+arrière} (branche \textbf{else}, ligne 21), de \textbf{propagations unitaires} (ligne 5),
+d'applications de la règle du \textbf{littéral pur} (ligne 11), et \textbf{temps passé dans
+l'heuristique} (mesuré autour de l'appel \texttt{choix(F)}). Le programme mesure aussi le
+\textbf{temps CPU} de la résolution (\texttt{time.process\_time}), lecture du fichier et
+démarrage de Python exclus : les temps sont donc plus faibles que ceux des
+tableaux~\ref{tab:q3} et~\ref{tab:q4}. Le \textbf{ratio heuristique} est le temps passé dans
+l'heuristique divisé par le temps de résolution.
+
+\paragraph{Solveurs comparés.} Dix configurations :
+\begin{itemize}
+  \item $H_0$, le choix aléatoire de l'algorithme 2, avec trois graines (0, 1, 2) pour mesurer
+        la part du hasard ;
+  \item $H_1$, qui est statique par nature (ordre des numéros de variables) ;
+  \item $H_2^d$, $H_3^d$, $H_4^d$, les versions dynamiques de la question 4 ;
+  \item $H_2^s$, $H_3^s$, $H_4^s$, leurs versions statiques, ajoutées pour répondre à la
+        troisième question de l'énoncé (intérêt du recalcul dynamique). La fonction
+        \texttt{ordre\_hX(F)} classe toutes les décisions $(p,b)$ selon le critère de $H_X$,
+        avec les mêmes règles d'égalité que la version dynamique ; l'ordre est calculé une seule
+        fois, puis chaque décision prend le premier couple $(p,b)$ dont la variable est encore
+        présente dans $F$.
+\end{itemize}
+
+\paragraph{Aménagement.} L'ordre statique est calculé sur la formule de la \emph{première
+décision}, c'est-à-dire la formule initiale après les propagations unitaires et littéraux purs
+qui précèdent toute décision. Certaines instances (\texttt{public-06}, \texttt{11}, \texttt{19},
+\texttt{23}) contiennent des clauses unitaires : sur la formule initiale, $H_4^s$ prendrait
+$k=1$ et classerait les seules variables de ces clauses, déjà affectées avant la première
+décision. Pour $H_4^s$, les variables absentes des clauses de taille minimale sont placées
+ensuite, par numéro croissant.
+
+\paragraph{Validation.} Les mesures ne doivent rien changer au calcul : sur 500 formules
+aléatoires, à graine égale, $H_0$ renvoie exactement le même résultat que \texttt{dpll}, et les
+versions dynamiques le même que \texttt{dpll\_h} ; les dix configurations sont d'accord avec la
+force brute ; et le premier élément de chaque ordre statique est bien le choix de l'heuristique
+dynamique correspondante.
+
+\paragraph{Protocole.} Les 30 instances \texttt{public-XX} (19 SAT, 11 UNSAT) et les 51 grilles
+Meowdoku de la question 1 (toutes SAT) ont été résolues par les dix configurations ; les
+11 petits tests sont résolus sans aucune décision par toutes et ne sont pas analysés. Chaque
+exécution est un processus séparé (\texttt{python mesures.py}), quatre en parallèle, limité à
+60~s ; en cas de dépassement, les compteurs atteints à l'interruption sont conservés.
+\textbf{Sur les 920 exécutions, aucune réponse n'est fausse} et tous les modèles sont vérifiés.
+Pour comparer les compteurs sur les mêmes instances, les totaux sont calculés sur le
+\emph{noyau commun} de chaque famille : les instances résolues par les dix configurations
+(11 SAT, 10 UNSAT, 41 grilles).
+
+\begin{table}[h]
+  \centering\small
+  \setlength{\tabcolsep}{4pt}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{l rrr rrr rrr rrr}
+    \toprule
+    & \multicolumn{3}{c}{résolues} & \multicolumn{3}{c}{décisions} & \multicolumn{3}{c}{CPU (s)}
+    & \multicolumn{3}{c}{ratio heur. (\%)}\\
+    \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}
+    & SAT & UNS. & Meow & SAT & UNS. & Meow & SAT & UNS. & Meow & SAT & UNS. & Meow\\
+    & /19 & /11 & /51 & & & & & & & & &\\
+    \midrule
+    $H_0$ (0) & 16 & 10 & 47 & 1\,820 & 9\,091 & 39\,015 & 3,65 & 26,10 & 40,1 & 3,1 & 3,1 & 2,9\\
+    $H_0$ (1) & 16 & 10 & 47 &   913 & 6\,076 &  2\,754 & 2,29 & 14,88 & 11,0 & 2,8 & 3,1 & 1,7\\
+    $H_0$ (2) & 15 & 10 & 47 & 1\,891 & 7\,885 & 60\,983 & 3,73 & 22,66 & 48,8 & 3,1 & 2,9 & 3,0\\
+    $H_1$     & 17 & 10 & 50 & 1\,518 & 5\,222 &  2\,228 & 3,44 & 16,71 & 12,7 & 4,4 & 3,3 & 1,4\\
+    \midrule
+    $H_2^d$   & 15 & 10 & 51 &   239 & 1\,423 &  4\,799 & 1,17 &  2,91 & 11,6 & 3,3 & 4,4 & 23,9\\
+    $H_3^d$   & 16 & 10 & 51 &   324 & 2\,269 &  4\,799 & 1,46 &  6,94 & 11,5 & 4,8 & 4,9 & 25,6\\
+    $H_4^d$   & \textbf{18} & 10 & 51 & \textbf{198} & \textbf{934} & 4\,397 & \textbf{0,55} & \textbf{0,70} & 12,4 & 4,1 & 4,3 & 33,3\\
+    \midrule
+    $H_2^s$   & 15 & 10 & 49 &   263 & 2\,094 & 27\,180 & 1,28 &  5,70 & 48,7 & 2,3 & 2,9 & 6,1\\
+    $H_3^s$   & 17 & 10 & 49 &   426 & 3\,417 & 27\,180 & 2,25 & 11,64 & 48,5 & 2,6 & 2,9 & 6,3\\
+    $H_4^s$   & \textbf{18} & 10 & 49 &   259 & 1\,095 & 27\,177 & 0,63 &  0,86 & 47,5 & 3,5 & 3,7 & 6,3\\
+    \bottomrule
+  \end{tabular}}
+  \caption{Synthèse par famille d'instances. « résolues » : en moins de 60~s ; les autres
+  colonnes sont des totaux sur le noyau commun (11 instances SAT, 10 UNSAT, 41 grilles).
+  Le nombre de propagations unitaires suit celui des décisions ; les retours arrière sont
+  commentés dans le texte.}
+  \label{tab:q5}
+\end{table}
+
+\begin{table}[h]
+  \centering\small
+  \setlength{\tabcolsep}{4pt}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{llrrrrrrrrrr}
+    \toprule
+    instance & att. & $H_0$(0) & $H_0$(1) & $H_0$(2) & $H_1$ & $H_2^d$ & $H_3^d$ & $H_4^d$ & $H_2^s$ & $H_3^s$ & $H_4^s$\\
+    \midrule
+    public-04 & SAT   & 28 & 18 & 14 & 229 & $>$59\,108 & 21\,207 & 735 & $>$89\,967 & 20\,562 & 1\,630\\
+    public-06 & SAT   & $>$14\,353 & 70 & $>$16\,383 & 93 & 627 & $>$2\,961 & 68 & 67 & 67 & 73\\
+    public-12 & SAT   & $>$232 & $>$249 & $>$258 & $>$221 & 18 & 5 & $>$465 & $>$97 & $>$120 & $>$810\\
+    public-21 & SAT   & 8 & 10 & 5 & 12 & $>$2\,470 & 63 & 61 & $>$17\,666 & 82 & 82\\
+    public-15 & UNSAT & 898 & 683 & 1\,032 & 1\,769 & 42 & 479 & 5 & 143 & 812 & 8\\
+    public-30 & UNSAT & 2\,236 & 1\,098 & 1\,787 & 888 & 263 & 481 & 24 & 766 & 1\,337 & 35\\
+    meow\_17\_1 & SAT & 1\,654 & 259 & $>$50\,885 & 30 & 63\,314 & 63\,314 & 18\,302 & 4\,517 & 4\,517 & 4\,517\\
+    meow\_19\_2 & SAT & $>$31\,208 & $>$37\,238 & 52 & 35 & 323 & 323 & 319 & $>$11\,479 & $>$10\,948 & $>$11\,373\\
+    meow\_20\_1 & SAT & 39 & 24 & 11\,547 & $>$10\,382 & 364 & 364 & 355 & 22\,739 & 22\,739 & 22\,739\\
+    \bottomrule
+  \end{tabular}}
+  \caption{Nombre de décisions sur quelques instances représentatives ; « $>$ » : valeur
+  atteinte à l'interruption (60~s). Le détail complet est dans le notebook.}
+  \label{tab:q5detail}
+\end{table}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{figures/cactus_q5.pdf}
+  \caption{Nombre d'instances résolues en fonction du temps CPU : les temps des instances
+  résolues par un solveur sont triés, le point $(k,t)$ signifie que $k$ instances sont résolues
+  en moins de $t$ secondes chacune. Une courbe basse et longue est meilleure. Une couleur par
+  heuristique ; trait plein : dynamique, pointillés : statique.}
+  \label{fig:cactus}
+\end{figure}
+
+\subsection{Analyse}
+
+\paragraph{Apport des heuristiques par rapport à l'algorithme 2.} Sur les instances
+\textbf{UNSAT}, qui obligent à parcourir tout l'arbre, le gain est net et régulier :
+$H_4^d$ fait 6 à 10 fois moins de décisions que $H_0$ (934 contre 6\,076 à 9\,091 sur le noyau
+commun) et va 20 à 37 fois plus vite (0,70~s contre 14,9 à 26,1~s). Sur les instances
+\textbf{SAT}, $H_4^d$ et $H_4^s$ résolvent 18 instances sur 19 contre 15 ou 16 pour $H_0$, avec
+5 à 10 fois moins de décisions. Mais une heuristique n'est pas meilleure partout
+(tableau~\ref{tab:q5detail}) : sur \texttt{public-04} et \texttt{public-21}, $H_0$ trouve un
+modèle en moins de 30 décisions alors que $H_2^d$ dépasse les 60~s ; à l'inverse, seules
+$H_2^d$ et $H_3^d$ résolvent \texttt{public-12}. Sur les grilles \textbf{Meowdoku}, les trois
+graines de $H_0$ résolvent chacune 47 grilles sur 51, mais pas les mêmes, et le nombre de
+décisions varie d'un facteur 22 d'une graine à l'autre (2\,754 contre 60\,983) ; les heuristiques
+dynamiques résolvent les 51 grilles. L'apport d'une heuristique est donc double : moins de
+décisions en moyenne, et un comportement reproductible au lieu d'une forte variance.
+
+\paragraph{Conformité aux intuitions.} Plusieurs résultats étaient attendus.
+\begin{itemize}
+  \item \textbf{$H_4$ (MOMS) est la meilleure sur les instances des enseignants}, en version
+        dynamique comme statique : en branchant sur les variables des plus petites clauses, elle
+        produit vite des clauses unitaires, donc des propagations et des conflits.
+  \item \textbf{Sur les instances UNSAT, retours arrière = décisions} pour toutes les
+        configurations : chaque décision voit ses deux branches échouer, donc chaque décision
+        donne exactement un retour arrière. C'est un contrôle de cohérence de l'instrumentation.
+  \item \textbf{Le ratio heuristique est faible sur les instances des enseignants} (3 à 5~\%),
+        ce qui confirme l'argument de la question 4 : le coût d'un appel est dominé par
+        \texttt{simplifier}, qui recopie la formule.
+\end{itemize}
+D'autres l'étaient moins.
+\begin{itemize}
+  \item \textbf{Sur Meowdoku, $H_1$ est aussi rapide que les heuristiques dynamiques}
+        (12,7~s contre 11,5 à 12,4~s sur le noyau commun) et fait moins de décisions (2\,228
+        contre 4\,397 à 4\,799). L'explication tient à la valeur choisie. $H_2$, $H_3$ et $H_4$
+        choisissent la polarité majoritaire ; or dans l'encodage de la question 1, toutes les
+        clauses binaires « au plus un » sont négatives : la décision est presque toujours
+        « pas de chat sur cette case » ($b=0$), ce qui élimine une seule case et propage peu
+        (4\,184 propagations unitaires pour $H_2^d$). $H_1$ pose au contraire un chat ($b=1$) :
+        les clauses « au plus un » propagent aussitôt l'interdiction de sa ligne, de sa colonne,
+        de sa région et de son voisinage (30\,000 propagations). Les heuristiques fréquentielles
+        progressent par petits pas sûrs (352 retours arrière seulement pour $H_2^d$, 81 pour
+        $H_4^d$) ; $H_1$ par grands pas qu'il faut parfois défaire (1\,921 retours), et elle
+        échoue sur \texttt{meow\_20\_1}.
+  \item \textbf{$H_2$ et $H_3$ font exactement les mêmes choix sur Meowdoku} : le littéral le
+        plus fréquent est toujours la négation de la variable la plus fréquente, puisque les
+        occurrences négatives dominent partout.
+  \item \textbf{La règle du littéral pur ne s'applique jamais sur Meowdoku.} Une variable
+        $x_{i,j}$ n'apparaît positivement que dans la clause « au moins un chat dans la région
+        de $(i,j)$ ». Cette clause ne disparaît que si un chat est placé dans la région, et la
+        propagation unitaire met alors $x_{i,j}$ à faux avant que la variable ne devienne pure.
+\end{itemize}
+
+\paragraph{Intérêt du recalcul dynamique.} Le coût du recalcul se lit dans le ratio
+heuristique. Sur les instances des enseignants, il reste modéré (3 à 5~\% en dynamique, 2 à
+4~\% en statique). Sur Meowdoku, il monte à 24--33~\% : les formules ont beaucoup de clauses
+binaires et chaque appel recompte toutes les occurrences ($\approx 0{,}6$ à 1~ms par appel,
+contre $\approx 0{,}1$~ms pour la version statique). Notons que la version statique n'est pas
+gratuite dans notre implémentation : elle doit déterminer les variables encore présentes dans
+$F$, en $O(|F|)$.
+
+La qualité des choix compense largement ce coût. Sur les instances UNSAT, la version dynamique
+fait 15 à 35~\% de décisions en moins ($H_2$ : 1\,423 contre 2\,094 ; $H_3$ : 2\,269 contre
+3\,417 ; $H_4$ : 934 contre 1\,095) et est plus rapide. Sur Meowdoku, l'écart est bien plus
+grand : 4\,799 décisions contre 27\,180, 4 fois moins de temps sur le noyau commun, et 51 grilles
+résolues contre 49. L'ordre statique est calculé alors que toutes les cases sont équivalentes ;
+il ne tient pas compte des chats déjà placés, alors que la version dynamique se concentre sur
+les régions et lignes où il reste peu de cases libres. Sur les instances SAT des enseignants,
+les deux versions sont proches ($H_4^s$ résout aussi 18 instances). En résumé, le recalcul
+dynamique ne change pas l'ordre de grandeur du coût d'un appel et améliore nettement les
+choix : c'est la version dynamique de $H_4$ que nous retenons comme base pour la question 6.
+
+\paragraph{Limites.} L'instance \texttt{public-03} (UNSAT, 63 variables, 168 clauses de taille
+3) n'est résolue par aucune configuration : même avec la meilleure heuristique, l'arbre à
+parcourir reste trop grand pour une implémentation qui recopie la formule à chaque appel
+(1,2 million de décisions en 60~s pour $H_4^d$). Les temps absolus dépendent de la charge de la
+machine (quatre exécutions en parallèle) ; les compteurs, eux, ne dépendent que de l'algorithme
+et sont reproductibles, sauf pour $H_0$, dont trois graines seulement ont été mesurées.
 
 %======================================================================
 \section*{Usage des assistants IA}
