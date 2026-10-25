@@ -15,6 +15,8 @@ partie1/
     ├── dpll.py               Q2 : lecture DIMACS, DPLL (algorithmes 1 et 2)
     ├── resoudre.py           Q3 : chaîne complète grille → CNF → DPLL → solution
     ├── heuristiques.py       Q4 : DPLL avec heuristique de branchement (H1 à H4)
+    ├── mesures.py            Q5 : DPLL_H instrumenté, versions statiques, mesures
+    ├── resultats_q5.json     Q5 : mesures brutes de la campagne
     ├── grilles/              Grilles d'exemple (dont celle de l'énoncé)
     └── projet_partie1.ipynb  Tests et expériences
 ```
@@ -34,6 +36,7 @@ python meowdoku.py grilles/grille_enonce.txt f.cnf      # encoder en DIMACS
 python dpll.py f.cnf --algo 2                           # résoudre un CNF
 python resoudre.py grilles/grille_enonce.txt sol.txt    # résoudre une grille
 python heuristiques.py f.cnf --heur H4                  # résoudre un CNF avec une heuristique
+python mesures.py f.cnf --heur H4s --limite 60          # mesures (décisions, retours, ...) en JSON
 ```
 
 ## Rapport
