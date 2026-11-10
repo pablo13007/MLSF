@@ -1,0 +1,520 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{Projet MLSF -- Un solveur SAT pour Meowdoku\\ \large Partie II -- Un langage de contraintes compilé vers SAT}
+\author{Pablo Bosch \and Cécile Chevrière}
+\date{Novembre 2026}
+
+\begin{document}
+\maketitle
+
+\paragraph{Organisation du rendu.} Le compilateur se trouve dans le dossier \code{partie2/}.
+Il réutilise tel quel le solveur de la partie I (\code{partie1/Session de travail/}). Chaque
+étape de la chaîne correspond à un module :
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+étape & module & question \\
+\midrule
+texte $\to$ arbre de syntaxe abstraite (AST) & \code{syntax.py} & Q2 \\
+table des symboles, vérifications & \code{symboles.py}, \code{analyse.py} & Q3 \\
+déroulement, simplifications $\to$ contraintes sans \code{forall} & \code{deroulement.py}, \code{ir.py} & Q3 \\
+encodage des domaines, comparaisons, globales, Tseitin $\to$ FNC & \code{fnc.py} & Q1, Q4 \\
+DIMACS, solveur de la partie I, décodage & \code{solveur.py} & Q1, Q5 \\
+ligne de commande & \code{csp.py} & \\
+\bottomrule
+\end{tabular}
+\end{center}
+L'interface est celle conseillée par l'énoncé (depuis \code{partie2/}) :
+\code{python csp.py m.csp} écrit la FNC au format DIMACS sur la sortie standard,
+\code{--dimacs f.cnf} l'écrit dans un fichier, et \code{--solve} affiche \code{s SATISFIABLE}
+suivi d'une ligne \code{nom = valeur} par variable, ou \code{s UNSATISFIABLE}. Nous avons
+ajouté \code{--ast} (arbre de syntaxe), \code{--deroule} (contraintes déroulées), \code{--stats}
+(tailles et temps) et \code{--heur} (heuristique du solveur, H4 par défaut). Les tests se
+lancent par \code{python -m tests.test\_X} pour X parmi \code{syntax}, \code{analyse},
+\code{fnc}, \code{exemples}, \code{meowdoku}. Le dossier \code{q6\_meowdoku/} contient les
+programmes de la question 6.
+
+%======================================================================
+\section{Question 1 -- Du fragment propositionnel au solveur}
+
+La première chaîne complète a été construite pour le fragment propositionnel, puis
+généralisée au fil des questions : c'est la même chaîne qui traite aujourd'hui tout le
+langage. Le fragment y est un cas particulier, celui où toutes les variables sont booléennes.
+
+\paragraph{Table des symboles.} \code{constraint w;} est rejeté si \code{w} n'est pas déclaré
+(\og nom non déclaré 'w' \fg). La table a été étendue à la question 3.
+
+\paragraph{Mise en FNC.} Chaque contrainte est d'abord mise en forme normale négative (FNN) :
+la négation descend jusqu'aux littéraux, et \code{a -> b} devient $\neg a \vee b$. On applique
+ensuite la transformation de Tseitin, sous la forme de Plaisted et Greenbaum.
+\begin{itemize}
+  \item Une conjonction au sommet donne une clause par conjoint. Une disjonction de littéraux
+        est déjà une clause : \code{a -> b}, \code{not (a and b)}, \code{(a and b) -> c} ne
+        coûtent aucune variable auxiliaire.
+  \item Seule une conjonction $\varphi$ imbriquée dans une disjonction reçoit une variable
+        auxiliaire $a$, avec les clauses $\neg a \vee \psi$ pour chaque conjoint $\psi$ de
+        $\varphi$.
+  \item Dans une FNN, toute sous-formule apparaît positivement. L'implication $a \to \varphi$
+        suffit donc : un modèle de la FNC rend vraie la formule (monotonie), et un modèle de la
+        formule se prolonge en posant $a = \varphi$. On économise ainsi la moitié des clauses de
+        définition de Tseitin.
+  \item Une sous-formule identique n'est définie qu'une fois, et les clauses en double ou
+        tautologiques sont supprimées.
+\end{itemize}
+
+\paragraph{Noms des variables.} Le fichier DIMACS commence par des commentaires
+\code{c var 3 z} pour les booléens, ou \code{c var 12 grid[1][3] = 3} pour les domaines finis
+(question 4). Les variables auxiliaires n'ont pas de nom et ne sont pas affichées.
+
+\paragraph{Validation (\code{tests/test\_fnc.py}).} Un générateur produit des modèles
+aléatoires (3 booléens, 1 à 3 contraintes de profondeur 1 à 3, avec \code{not}, \code{and},
+\code{or}, \code{->}, \code{=} et \code{!=} entre booléens et les contraintes globales). Un
+évaluateur de l'AST, écrit dans le test indépendamment du compilateur, fournit la réponse par
+recherche exhaustive. Trois propriétés sont vérifiées :
+\begin{enumerate}
+  \item la FNC est satisfiable si et seulement si le modèle l'est ;
+  \item la restriction d'un modèle de la FNC aux variables nommées est une solution du modèle ;
+  \item pour \emph{chaque} valuation des variables nommées, la FNC complétée par les clauses
+        unitaires qui fixent ces variables est satisfiable si et seulement si la valuation est
+        une solution. Les variables auxiliaires n'ajoutent ni ne retirent donc aucune solution.
+\end{enumerate}
+300 modèles sont testés, dont 100 pour la propriété 3. Le test étendu aux domaines finis
+(question 4) en ajoute 300 autres. Pour vérifier que ce filet attrape réellement les
+erreurs, nous avons injecté deux erreurs dans \code{fnc.py} : une inégalité stricte traduite
+comme large, et un littéral oublié dans les clauses. Les deux ont été détectées.
+
+%======================================================================
+\section{Question 2 -- Analyse syntaxique}
+
+\paragraph{Grammaire.} La grammaire (\code{syntax.py}) reste LALR(1)
+(\code{parser="lalr"}, analyseur lexical \code{basic}). Les priorités sont encodées par
+niveaux successifs, du moins prioritaire au plus prioritaire :
+\begin{center}
+\code{->} (droite) $<$ \code{or} (gauche) $<$ \code{and} (gauche) $<$ \code{not} $<$
+comparaisons (non associatives) $<$ \code{+ -} (gauche) $<$ \code{*} (gauche) $<$
+\code{-} unaire $<$ atomes.
+\end{center}
+\begin{itemize}
+  \item Les comparaisons sont plus prioritaires que \code{not} : \code{not x = 2} se lit
+        \code{not (x = 2)}. Elles ne s'enchaînent pas, car la règle est
+        \code{comparison: sum OP sum}, sans récursion : \code{a = b = c} est une erreur de
+        syntaxe.
+  \item Les atomes sont un entier, un nom, un accès \code{t[e]...[e]}, un appel
+        \code{f(e, ..., e)} ou une expression parenthésée. Un indice est une expression ou le
+        joker \code{*}. Aucune expression ne commence par \code{*} : après \code{[}, le
+        lexème \code{*} ne peut être que le joker, d'où l'absence de conflit avec la
+        multiplication.
+  \item Les contraintes globales et \code{abs} sont de simples appels de fonction : en
+        ajouter une ne change pas la grammaire.
+  \item Un domaine est \code{bool}, \code{sum .. sum} ou un nom (type énuméré). Le conflit
+        potentiel entre \og nom de type \fg{} et \og nom utilisé comme borne \fg{}
+        (\code{var c : Color;} contre \code{var x : N..M;}) est tranché par le lexème
+        suivant : \code{;} dans le premier cas, \code{..} ou un opérateur dans le second.
+        Lark n'a signalé aucun conflit.
+  \item Une dimension de tableau est une expression ; un nom de type énuméré
+        (\code{used[Color]}) est reconnu à l'analyse.
+  \item Le corps d'un \code{forall} ne contient que des contraintes et des \code{forall} :
+        une déclaration dans une boucle est une erreur de syntaxe.
+\end{itemize}
+Les onze mots-clés sont réservés grâce à l'analyseur lexical \code{basic}, qui produit
+toujours un lexème mot-clé et jamais un \code{NAME} (\code{var in : bool;} est rejeté). Un nom
+qui commence par un mot-clé (\code{index}, \code{order}) reste un nom.
+
+\paragraph{Arbre de syntaxe abstraite.} Une classe par construction : \code{ConstDecl},
+\code{ConstArrayDecl}, \code{EnumDecl}, \code{VarDecl}, \code{ArrayDecl}, \code{Constraint},
+\code{Forall}, \code{RangeDomain}, \code{EnumDomain} (\code{bool} compris), et pour les
+expressions \code{Var}, \code{IntLit}, \code{Not}, \code{And}, \code{Or}, \code{Implies},
+\code{Compare}, \code{BinOp}, \code{Neg}, \code{Access}, \code{Wildcard}, \code{Call}. Les
+classes du code de départ sont conservées. \code{pretty} affiche l'arbre (\code{--ast}) en
+parenthésant chaque opérateur ; \code{source} réécrit le modèle en texte entièrement
+parenthésé.
+
+\paragraph{Tests (\code{tests/test\_syntax.py}).} Les tests couvrent les priorités et
+associativités (anciens et nouveaux opérateurs), les déclarations, 13 erreurs de syntaxe
+(avec leur position), les onze mots-clés réservés, et tous les exemples (y compris ceux du
+dossier \code{exemples/}, tous acceptés). Ils vérifient aussi l'aller-retour
+\code{parse(source(p)) == p} sur tous les modèles fournis.
+
+%======================================================================
+\section{Question 3 -- Analyse et transformation de l'arbre}
+
+Le travail est découpé en deux passes.
+
+\paragraph{Passe 1 : analyse statique (\code{analyse.py}).} Les instructions sont parcourues
+dans l'ordre du texte, avec un seul espace de noms : un nom doit être déclaré avant d'être
+utilisé, ce que respectent tous les exemples.
+\begin{itemize}
+  \item Une \emph{déclaration} est vérifiée, puis ses valeurs connues (tailles, bornes de
+        domaine, données des tableaux constants) sont calculées aussitôt et rangées dans la
+        table des symboles. Celle-ci connaît les constantes entières, les tableaux constants
+        (dimensions, données, type des cases), les types énumérés et leurs valeurs (codes
+        $0, 1, \dots$), les variables et les tableaux de variables (dimensions, domaine).
+  \item Une \emph{contrainte} est typée une seule fois, sur son texte, avec les indices de
+        boucle typés par leur domaine. Le typage renvoie le type (entier, booléen, type
+        énuméré), un indicateur \og valeur connue \fg{} et un indicateur \og tranche \fg.
+\end{itemize}
+Les erreurs détectées sont : nom non déclaré ou déclaré deux fois, y compris un indice de
+boucle ; types incompatibles (couleur contre entier, arithmétique sur des booléens,
+\code{<} entre booléens, connecteur sur un entier, contrainte non booléenne) ; valeur inconnue
+là où une valeur connue est exigée (\code{x + 1 = y}, indice, borne, taille, constante) ;
+mauvais nombre d'indices ; indice du mauvais type ; tranche hors d'une contrainte globale ;
+fonction inconnue ; mauvais arguments d'une globale ou de \code{abs} ; domaine vide ; données
+d'un tableau constant de mauvaise forme. Le choix d'une passe statique a une conséquence
+voulue : une erreur de type est signalée même dans une partie qu'un filtre rendrait inutile
+(\code{i < 3 -> a[i] = 1} avec \code{a} booléen). Le modèle est faux quelle que soit la
+valeur de \code{i}.
+
+\paragraph{Passe 2 : déroulement et simplification (\code{deroulement.py}).} Chaque
+\code{forall} est remplacé par ses instances. Les bornes peuvent dépendre des indices
+précédents (\code{j in i..N}). Un évaluateur calcule chaque expression dans l'environnement des
+indices de boucle. Il renvoie soit une valeur connue (entier, booléen, valeur énumérée), soit
+un terme de la représentation intermédiaire (\code{ir.py}) :
+\begin{itemize}
+  \item des \emph{cases} \code{Cell("grid", (1, 2))} ;
+  \item les connecteurs \code{INot}, \code{IAnd}, \code{IOr}, \code{IIff} (\code{=} entre
+        booléens) ;
+  \item des comparaisons normalisées \code{Cmp}. Entre une variable et une valeur, les
+        opérateurs sont \code{= != <= >=} ; entre deux variables, \code{= != < <=} ;
+  \item les globales \code{Glob}.
+\end{itemize}
+Les simplifications appliquées :
+\begin{itemize}
+  \item valeurs connues calculées : arithmétique, \code{abs}, accès aux tableaux constants,
+        comparaisons entre valeurs connues ;
+  \item évaluation paresseuse de gauche à droite de \code{and}, \code{or}, \code{->} : si
+        l'opérande gauche connu suffit, le droit n'est pas évalué ;
+  \item connecteurs simplifiés quand un opérande est connu (\code{faux and e} donne faux,
+        etc.) ;
+  \item négation poussée jusqu'aux feuilles : De Morgan, \code{not (x = 2)} donne \code{x != 2},
+        \code{not (x < y)} donne \code{y <= x} ;
+  \item \code{x > y} réécrit en \code{y < x}, \code{x < c} en \code{x <= c-1}, \code{c < x}
+        en \code{x >= c+1} ;
+  \item comparaisons tranchées par le domaine : \code{x = 10} avec \code{x} dans \code{1..9}
+        donne faux, \code{x <= 100} donne vrai, \code{x >= 9} donne \code{x = 9} ;
+  \item tranches remplacées par la liste de leurs cases, ligne par ligne ;
+  \item arguments connus des globales simplifiés (un argument vrai dans \code{atMostOne}
+        force les autres à faux, deux valeurs égales dans \code{allDifferent} donnent faux,
+        une valeur $c$ dans \code{allDifferent} donne \code{x != c} pour chaque case $x$).
+\end{itemize}
+Le court-circuit fait des conditions connues des filtres : dans
+\code{i < N -> grid[i + 1][1] != grid[i][1]}, l'accès \code{grid[N + 1][1]} n'est jamais
+évalué. Un accès hors bornes effectivement évalué est une erreur, détectée dans cette passe
+puisqu'elle dépend des valeurs, avec les valeurs des indices de boucle dans le message :
+\begin{center}
+\code{l'indice 1 de 'a' vaut 4, hors de 1..3 (dans 'a[(i + 1)]') (pour i = 3)}
+\end{center}
+Une contrainte qui se simplifie en vrai disparaît. Une contrainte qui se simplifie en faux
+donne un avertissement (\og contrainte toujours fausse \fg) et une clause vide dans la FNC.
+
+\paragraph{Tests (\code{tests/test\_analyse.py}).}
+\begin{itemize}
+  \item La collection \code{exemples/erreurs/} compte 33 modèles erronés ; chacun annonce en
+        première ligne le message attendu. Chaque modèle doit être rejeté par une
+        \code{CompileError} contenant ce message, jamais par une autre exception Python. En
+        ligne de commande, le code de retour est 1 et il n'y a pas de trace Python.
+  \item De petits modèles dont on connaît le résultat déroulé et simplifié (normalisations,
+        valeurs connues, tranches, globales).
+  \item Des accès hors bornes protégés par une condition fausse, qui ne doivent provoquer
+        aucune erreur, et d'autres non protégés ou protégés trop tard (\code{a[i+1] and i < 3}),
+        qui doivent en provoquer une.
+\end{itemize}
+
+%======================================================================
+\section{Question 4 -- Traduction en FNC}
+
+\paragraph{Encodage direct.} Une variable de domaine $\{v_1,\dots,v_k\}$ devient $k$
+variables booléennes $x_{v}$, avec la clause \og au moins une \fg{} et les $k(k-1)/2$ clauses
+\og au plus une \fg. Pour \code{var x : 1..3;}, on obtient exactement les 4 clauses de
+l'énoncé (test). Les valeurs énumérées sont numérotées dans l'ordre de déclaration.
+
+\paragraph{Polarité.} La traduction (\code{FNC.to\_prop}) produit directement une FNN et
+transmet la polarité vers le bas. Une comparaison niée est traduite sous sa forme niée
+(\code{x = y} niée devient \code{x != y}), plutôt que comme la négation de sa traduction. On
+garde ainsi, dans les deux polarités, une traduction en clauses, sans variable auxiliaire.
+
+\paragraph{Comparaisons.} Toutes les traductions s'appuient sur les clauses \og exactement
+une \fg{} des domaines. Notons $k = |D(x)|$.
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+comparaison & traduction retenue & taille \\
+\midrule
+\code{x = c}, \code{x != c} & $x_c$, $\neg x_c$ & 1 littéral \\
+\code{x <= c} & $\bigvee_{v \le c} x_v$ & 1 clause \\
+\code{x >= c} & $\bigvee_{v \ge c} x_v$ & 1 clause \\
+\code{x = y} & $\bigwedge_{v} (\neg x_v \vee y_v)$ & $k$ clauses binaires \\
+\code{x != y} & $\bigwedge_{v} (\neg x_v \vee \neg y_v)$ & $k$ clauses binaires \\
+\code{x < y}, \code{x <= y} & $\bigwedge_{v} (\neg x_v \vee \bigvee_{w > v} y_w)$
+  (resp. $w \ge v$) & $k$ clauses, longueur $\le k+1$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{itemize}
+  \item \code{x <= c} peut s'écrire $\bigvee_{v\le c} x_v$ (une clause) ou
+        $\bigwedge_{v > c}\neg x_v$ (des clauses unitaires). Au sommet d'une contrainte, les
+        deux conviennent. Sous une disjonction (\code{b or x <= 2}), la première se fond dans
+        la clause englobante ($b \vee x_1 \vee x_2$), alors que la seconde demanderait une
+        variable auxiliaire. Nous retenons donc la forme disjonctive, qui donne toujours une
+        seule clause.
+  \item \code{x = y} s'écrirait naturellement $\bigvee_v (x_v \wedge y_v)$, qui demande une
+        variable auxiliaire par valeur. La forme \og $x_v \to y_v$ pour tout $v$ \fg{} n'en
+        demande aucune, grâce à \og exactement une \fg{} sur $y$. Quand $v \notin D(y)$, la
+        clause se réduit à $\neg x_v$.
+  \item \code{x < y} s'écrirait $\bigvee_{v<w}(x_v\wedge y_w)$, soit $O(k^2)$ conjonctions
+        et autant de variables auxiliaires. Nous préférons $k$ clauses \og si $x$ vaut $v$,
+        alors $y$ prend une valeur $> v$ \fg. Les clauses sont plus longues (jusqu'à $k+1$
+        littéraux), mais il n'y a aucune variable auxiliaire et leur nombre est linéaire.
+\end{itemize}
+Les tests \code{test\_comparaisons} vérifient ces tailles, et la validation aléatoire de la
+question 1, étendue aux domaines finis (3 entiers de domaines \code{1..3}, \code{1..3},
+\code{2..4}, deux énumérés, constantes hors domaine, toutes les comparaisons, \code{=} entre
+booléens, \code{allDifferent} avec constantes), vérifie leur correction.
+
+\paragraph{Contraintes globales.} \code{atLeastOne} est la disjonction des arguments.
+\code{atMostOne} utilise l'encodage deux à deux ($n(n-1)/2$ clauses, aucune variable
+auxiliaire), et \code{exactlyOne} la conjonction des deux. \code{allDifferent} est traduite,
+pour chaque valeur $v$, par \code{atMostOne} des $x_v$. Ces traductions sont des formules
+propositionnelles comme les autres, ce qui permet de les utiliser sous une négation : pour
+\code{not atMostOne(a, b, c)}, la négation des clauses donne $\bigvee_{i<j} (l_i \wedge l_j)$,
+avec une variable auxiliaire par paire (test).
+
+\paragraph{Non traité.} Nous n'avons pas traité le compteur séquentiel de Sinz (\og pour
+aller plus loin \fg). L'encodage deux à deux suffit aux tailles rencontrées.
+
+%======================================================================
+\section{Question 5 -- Jonction avec la partie I}
+
+\code{solveur.py} écrit la FNC dans un fichier DIMACS : celui de \code{--dimacs}, ou un
+fichier temporaire. Ce fichier est relu par \code{lire\_dimacs} de la partie I et résolu par
+\code{dpll\_h} avec l'heuristique H4 dynamique, retenue à la question 5 de la partie I. Le
+fichier DIMACS est donc la seule interface entre le compilateur et le solveur. Le modèle
+renvoyé est complété (\code{completer}) et vérifié sur la FNC (\code{verifier\_modele}). La
+valeur de chaque variable est ensuite retrouvée : pour une variable à domaine fini, c'est
+l'unique $v$ tel que $x_v$ est vraie. La solution décodée est enfin vérifiée sur les
+contraintes déroulées par un évaluateur de l'IR (\code{ir.evaluer}), indépendant de la FNC.
+
+\begin{center}
+\begin{tabular}{lrrrrl}
+\toprule
+modèle & cases & contraintes déroulées & variables & clauses & réponse \\
+\midrule
+\code{pigeonhole.csp} & 4 & 1 & 12 & 34 & insatisfiable \\
+\code{queens.csp} & 8 & 281 & 64 & 736 & satisfiable \\
+\code{coloring.csp} & 10 & 17 & 30 & 87 & satisfiable \\
+\code{sudoku.csp} & 81 & 57 & 729 & 10\,317 & satisfiable \\
+\bottomrule
+\end{tabular}
+\end{center}
+Les réponses sont celles du tableau 1 de l'énoncé. Aucun de ces modèles n'introduit de
+variable auxiliaire. Le Sudoku est résolu en 2~s environ, les autres en moins de 0,05~s.
+
+\paragraph{Vérification des solutions (\code{tests/test\_exemples.py}).} Les vérificateurs
+lisent uniquement la sortie texte de \code{python csp.py m.csp --solve} :
+\begin{itemize}
+  \item huit reines : colonnes deux à deux distinctes, pas de diagonale commune ;
+  \item coloration : les 15 arêtes du graphe de Petersen relient des couleurs différentes, et
+        \code{color[1] = Red}, \code{color[2] = Green} ;
+  \item Sudoku : lignes, colonnes et carrés sont des permutations de 1..9, et les cases
+        données sont respectées. Ces données sont relues dans le fichier du modèle.
+\end{itemize}
+
+%======================================================================
+\section{Question 6 -- Modéliser : le modèle compte plus que le solveur}
+
+Les programmes sont dans \code{q6\_meowdoku/}, et les règles dans
+\code{q6\_meowdoku/regles/}. Les grilles $N \times N$ à $N$ régions sont produites par le
+générateur de la partie I, avec trois graines par taille.
+
+\paragraph{6.1 Conversion.} \code{grille\_vers\_csp.py} lit une grille au format de la partie I
+(\code{lire\_grille}) et écrit les déclarations de l'énoncé : \code{N}, \code{M}, \code{K},
+\code{enum Zone} et \code{const region[N][M]}. Avec \code{--regles}, il recopie le fichier de
+règles à la suite. Un nom de région qui n'est pas un identifiant, ou qui est déjà pris par un
+mot-clé ou par les règles (une région nommée \code{K} ou \code{N} apparaît dès 11 régions),
+est préfixé par \code{Z\_}.
+
+\paragraph{6.2 Au plus un chat par région.} Pour deux cases distinctes d'une même région,
+prises dans l'ordre ligne par ligne, on interdit qu'elles portent toutes deux un chat :
+\begin{verbatim}
+forall i1 in 1..N, j1 in 1..M, i2 in 1..N, j2 in 1..M {
+    constraint (i1 < i2 or (i1 = i2 and j1 < j2)) and region[i1][j1] = region[i2][j2]
+               -> not (cat[i1][j1] and cat[i2][j2]);
+}
+\end{verbatim}
+La condition ne porte que sur des valeurs connues : elle filtre les paires à la compilation,
+et chaque instance retenue donne une clause binaire. \code{verifier.py} est un vérificateur
+indépendant : il ne lit que la grille et la sortie texte de \code{csp.py --solve}, retrouve les
+chats (\code{row[z]}, \code{col[z]} ou \code{cat[i][j] = true}), contrôle pour le premier modèle
+que le chat de $z$ est bien dans $z$, puis applique le vérificateur de la partie I. Le script
+\code{resoudre\_grilles.py} résout la grille de l'énoncé et 15 grilles de tailles 4 à 8 avec
+les quatre fichiers de règles : les 64 solutions sont validées. Sur la grille de l'énoncé, les
+deux modèles redonnent la solution de la partie I.
+
+\paragraph{Protocole des mesures (6.3, 6.4).} \code{experiences.py} compile chaque modèle,
+écrit le DIMACS et le résout avec l'instrumentation de la partie I (\code{mesures.mesurer} :
+décisions, retours arrière, propagations, temps CPU), avec une limite de 60~s. La campagne
+compte 156 mesures, sur 3 grilles par taille. Les tableaux donnent la médiane sur les trois
+grilles ; « TO » compte les dépassements de la limite. Toutes les mesures terminées sont
+SAT, avec un modèle valide.
+
+\paragraph{6.3 Comparaison des deux modèles.}
+\begin{center}
+\begin{tabular}{r rrrr rrrr}
+\toprule
+ & \multicolumn{4}{c}{premier modèle (\code{row}, \code{col})} & \multicolumn{4}{c}{second modèle (\code{cat})} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+$N$ & var. & clauses & décisions & CPU (s) & var. & clauses & décisions & CPU (s) \\
+\midrule
+6  &  72 &  2\,052 &  48 & 0,02 &  36 &    267 &  23 & 0,00 \\
+8  & 128 &  6\,848 &  96 & 0,11 &  64 &    642 &  47 & 0,01 \\
+10 & 200 & 17\,300 & 162 & 0,50 & 100 & 1\,268 &  78 & 0,02 \\
+12 & 288 & 36\,720 & 241 & 1,88 & 144 & 2\,215 & 119 & 0,06 \\
+14 & 392 & 69\,188 & 334 & 8,43 & 196 & 3\,597 & 165 & 0,18 \\
+\bottomrule
+\end{tabular}
+
+\smallskip
+{\small Heuristique H4 dynamique (celle de la partie I). Compilation à $N=14$ : 7 à 9~s
+pour le premier modèle, 0,4~s pour le second.}
+\end{center}
+Le second modèle est plus rapide, et l'écart grandit avec $N$ : un facteur 11 à $N = 8$,
+47 à $N = 14$. Le compilateur et
+le solveur étant les mêmes, l'écart vient de la formule produite.
+\begin{itemize}
+  \item \textbf{Taille.} Dans le premier modèle, la règle de voisinage porte sur tous les
+        couples de régions et toutes les positions : environ $\frac{K^2}{2}\cdot N M \cdot 4$
+        instances, soit $O(N^4)$ clauses de 4 littéraux (69\,188 clauses à $N = 14$, 19 fois
+        plus que le second modèle). La règle « le chat de $z$ est dans $z$ » ajoute
+        $K(NM - |z|)$ clauses binaires. Le second modèle n'a que des clauses binaires en
+        $O(N^3)$ et $2N$ clauses « au moins un ». Or chaque appel de notre DPLL recopie la
+        formule : le coût d'un nœud est proportionnel au nombre de clauses.
+  \item \textbf{Propagation.} Le premier modèle fait aussi deux fois plus de décisions. Une
+        position de chat y est une conjonction $\code{row}[z] = i \wedge \code{col}[z] = j$.
+        Fixer la ligne d'un chat ne dit rien de ses voisins tant que sa colonne est inconnue,
+        car une clause de voisinage de 4 littéraux ne propage qu'une fois trois d'entre eux
+        faux. Dans le second modèle, poser un chat sur $(i,j)$ élimine aussitôt, par des
+        clauses binaires, toute sa ligne, sa colonne, sa région et ses voisins diagonaux. Les
+        clauses « exactement un par ligne et par colonne » forcent en outre la dernière case
+        libre d'une ligne. Le premier modèle n'a pas d'équivalent : \code{allDifferent} ne
+        donne que des clauses « au plus un » par valeur.
+  \item Avec l'heuristique aléatoire H0, le premier modèle dépasse la limite sur 3 des 6
+        grilles de tailles 12 et 14, alors que le second les résout toutes (médiane 0,14~s à
+        $N = 14$, au plus 9,4~s).
+\end{itemize}
+
+\paragraph{6.4 Contrainte redondante : au moins un chat par région.} Aucune tranche ne
+désigne les cases d'une région. Nous l'écrivons dans le langage, sans l'étendre, avec un
+tableau auxiliaire :
+\begin{verbatim}
+array inzone[Zone][N][M] : bool;
+forall z in Zone, i in 1..N, j in 1..M {
+    constraint inzone[z][i][j] = (region[i][j] = z and cat[i][j]);
+}
+forall z in Zone { constraint atLeastOne(inzone[z][*][*]); }
+\end{verbatim}
+À la compilation, la condition connue \code{region[i][j] = z} fait de chaque contrainte
+\code{not inzone[z][i][j]} (case hors de $z$) ou \code{inzone[z][i][j] = cat[i][j]} (case de
+$z$). La tranche \code{inzone[z][*][*]} désigne alors exactement les cases de $z$ : après
+propagation, la clause « au moins un » est celle de la partie I. Le prix est de $K N M$
+variables auxiliaires, dont $K N M - N M$ fixées à faux par des clauses unitaires.
+\begin{center}
+\begin{tabular}{r rrr rrr rr}
+\toprule
+ & \multicolumn{3}{c}{sans la règle} & \multicolumn{3}{c}{avec la règle} & \multicolumn{2}{c}{CPU H4 (s)} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-9}
+$N$ & var. & déc. H1 & CPU H1 (s) & var. & déc. H1 & CPU H1 (s) & sans & avec \\
+\midrule
+6  &  36 &       6 &          0,00 &    252 &  4 &       0,03 & 0,00 & 0,03 \\
+8  &  64 &       6 &          0,00 &    576 &  6 &       0,21 & 0,01 & 0,19 \\
+10 & 100 &      78 &          0,03 & 1\,100 & 15 &       0,94 & 0,02 & 0,91 \\
+12 & 144 & 4\,102 &          1,69 & 1\,872 & 14 &       3,67 & 0,06 & 3,07 \\
+14 & 196 &     868 &          0,35 & 2\,940 & 16 &      14,71 & 0,18 & 13,75 \\
+16 & 256 & 38\,595 & 53 (2 TO) & 4\,352 & -- & (3 TO) & 0,33 & (2 TO) \\
+18 & 324 & 61\,313 & 49 (2 TO) & 6\,156 & -- & (3 TO) & 0,62 & (3 TO) \\
+20 & 400 & 69\,710 & 45 (3 TO) & 8\,400 & -- & (3 TO) & 1,23 & (3 TO) \\
+\bottomrule
+\end{tabular}
+\end{center}
+Deux effets s'opposent.
+\begin{itemize}
+  \item \textbf{La redondance élague l'arbre.} Avec H1, qui pose un chat sur la première case
+        libre et doit souvent revenir en arrière, la règle fait passer le nombre de décisions
+        de 4\,102 à 14 à $N = 12$, et les retours arrière de 4\,094 à 6. Sans elle, une région
+        dont toutes les cases sauf une sont exclues n'oblige à rien ; avec elle, la dernière
+        case est forcée par propagation unitaire, et une région vidée provoque un conflit
+        immédiat au lieu d'être découverte bien plus bas dans l'arbre. Avec H4, qui ne
+        revient déjà jamais en arrière sur ces grilles, la règle ne change pas le nombre de
+        décisions.
+  \item \textbf{Les variables auxiliaires coûtent cher à notre solveur.} Les $K N M$
+        variables \code{inzone} sont presque toutes affectées par propagation unitaire, et
+        chaque propagation recopie la formule. Le temps croît donc comme
+        $K N M \times |F|$ : 13,7~s à $N = 14$ contre 0,18~s, quelle que soit l'heuristique.
+        À partir de $N = 16$, la plupart des résolutions dépassent la limite de 60~s,
+        certaines avant même la première décision.
+\end{itemize}
+Dans notre implémentation, la règle redondante ne paie donc que lorsque la recherche est
+mauvaise (H1). Ce coût vient de notre écriture, qui passe par des auxiliaires, et du coût
+linéaire d'une propagation dans notre DPLL ; ce n'est pas un défaut de la redondance
+elle-même. Un solveur à littéraux surveillés rendrait ces propagations presque gratuites, et
+une liste en compréhension (question optionnelle, non traitée) donnerait directement la
+clause, sans auxiliaire.
+
+\paragraph{6.5 Grilles quelconques.} Pour $N$, $M$ et $K$ libres, \code{modele2\_general.csp}
+reprend les règles de la partie I :
+\begin{itemize}
+  \item \emph{au plus} un chat par ligne et par colonne (\code{atMostOne} : « exactement
+        un » n'est plus vrai si $K < N$) ;
+  \item pas deux chats voisins en diagonale (les voisins sur une même ligne ou une même
+        colonne sont déjà exclus) ;
+  \item exactement un chat par région : la règle 6.2, plus la règle 6.4, qui n'est plus
+        redondante.
+\end{itemize}
+\code{exhaustif.py} engendre des grilles aléatoires ($N, M \in [2,5]$, $1 \le K \le 6$ régions
+connexes, sans garantie de solution). Il compare la réponse du compilateur à une recherche
+exhaustive indépendante : il essaie tous les choix d'une case par région et garde ceux que le
+vérificateur de la partie I accepte. Sur 300 grilles (141 SAT, 159 UNSAT), les 300 réponses
+coïncident, et les 141 solutions sont validées par \code{verifier.py}.
+
+\paragraph{6.6 Conclusion.} Les deux leviers comptent, mais pas au même niveau.
+\begin{itemize}
+  \item \textbf{Le choix du modèle fixe l'ordre de grandeur.} À $N = 14$, la \emph{meilleure}
+        heuristique sur le premier modèle (H4 : 8,4~s, 7 à 9~s de compilation en plus) est
+        60 fois plus lente, en médiane, que la \emph{pire} sur le second (H0 : 0,14~s). Le premier modèle
+        est plus gros, en $O(N^4)$ clauses contre $O(N^3)$, et propage moins. Aucune
+        heuristique ne rattrape cela, puisque le coût de chaque nœud est proportionnel à la
+        taille de la formule.
+  \item \textbf{L'heuristique compte ensuite, et peut être catastrophique.} Sur le second
+        modèle, H1 dépasse la limite sur 7 des 9 grilles de tailles 16 à 20, que H4 résout en
+        moins de 1,3~s. En partie I, les heuristiques apportaient un facteur 4 à 37.
+  \item \textbf{Les deux interagissent.} H1, la meilleure sur le premier modèle, est la pire
+        sur le second. Une contrainte redondante, qui est un choix de modélisation, divise par
+        300 le nombre de décisions de H1, mais elle est sans effet pour H4.
+\end{itemize}
+Dans nos expériences, le choix du modèle est donc ce qui a le plus d'effet : il détermine la
+taille de la formule et la force de la propagation unitaire, c'est-à-dire le terrain sur
+lequel l'heuristique travaille. Les écarts entre heuristiques sont importants, mais ils se
+jouent à l'intérieur d'un modèle donné.
+
+%======================================================================
+\section*{Ce qui n'a pas été traité}
+Nous n'avons pas traité les parties \og pour aller plus loin \fg{} (positions ligne et colonne
+dans les messages d'erreur, compteur séquentiel de Sinz) ni les questions optionnelles.
+Les messages d'erreur sémantique ne donnent donc pas de position, mais ils citent
+l'expression en cause et, au déroulement, les valeurs des indices de boucle.
+
+%======================================================================
+\section*{Usage des assistants IA}
+Pour chaque question, nous avons d'abord défini notre stratégie de résolution. Nous avons ensuite
+utilisé Claude (Opus 5.5) pour générer une première version du code, des tests et du rapport,
+que nous avons relus, testés et repris.
+
+\end{document}

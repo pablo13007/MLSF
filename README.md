@@ -2,6 +2,8 @@
 
 Projet du cours MLSF (2026-27), par Pablo Bosch et Cécile Chevrière.
 Partie I : encoder le puzzle Meowdoku en formule SAT (CNF), puis le résoudre avec un solveur DPLL écrit nous-mêmes.
+Partie II : un compilateur d'un petit langage de contraintes vers SAT, qui réutilise le solveur de la partie I
+(détails, commandes et tests dans [`partie2/README.md`](partie2/README.md)).
 
 ## Arborescence
 
@@ -19,6 +21,17 @@ partie1/
     ├── resultats_q5.json     Q5 : mesures brutes de la campagne
     ├── grilles/              Grilles d'exemple (dont celle de l'énoncé)
     └── projet_partie1.ipynb  Tests et expériences
+partie2/
+├── csp.py                    Ligne de commande du compilateur
+├── syntax.py                 Q2 : grammaire Lark, AST
+├── symboles.py, analyse.py   Q3 : table des symboles, vérifications
+├── deroulement.py, ir.py     Q3 : déroulement des forall, simplifications
+├── fnc.py                    Q1/Q4 : encodage des domaines, comparaisons, globales, Tseitin
+├── solveur.py                Q1/Q5 : DIMACS, appel au solveur de la partie I, décodage
+├── exemples/                 Modèles de l'énoncé, fragment propositionnel, modèles erronés
+├── tests/                    Tests de chaque étape
+├── q6_meowdoku/              Q6 : conversion des grilles, règles, vérificateur, expériences
+└── rapport.tex               Rapport de la partie II
 ```
 
 ## Installation
@@ -39,7 +52,14 @@ python heuristiques.py f.cnf --heur H4                  # résoudre un CNF avec 
 python mesures.py f.cnf --heur H4s --limite 60          # mesures (décisions, retours, ...) en JSON
 ```
 
+## Utilisation de la partie II (depuis `partie2/`)
+
+```bash
+python csp.py exemples/sudoku.csp --solve        # résoudre un modèle
+python csp.py exemples/sudoku.csp --dimacs f.cnf # écrire la FNC
+```
+
 ## Rapport
 
-Compiler `partie1/rapport.tex` avec `latexmk -pdf` ou LaTeX Workshop.
+Compiler `partie1/rapport.tex` et `partie2/rapport.tex` avec `latexmk -pdf` ou LaTeX Workshop.
 Le PDF n'est pas régénéré automatiquement : il faut le recompiler après chaque modification du `.tex`.
