@@ -1,0 +1,3 @@
+// erreur attendue : atMostOne attend des booléens, pas un entier
+array a[3] : 1..3;
+constraint atMostOne(a[*]);

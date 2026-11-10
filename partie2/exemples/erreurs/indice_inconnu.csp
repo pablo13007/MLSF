@@ -1,0 +1,4 @@
+// erreur attendue : doit être une valeur connue
+array a[3] : bool;
+var i : 1..3;
+constraint a[i];

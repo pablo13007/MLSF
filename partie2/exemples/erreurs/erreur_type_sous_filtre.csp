@@ -1,0 +1,4 @@
+// erreur attendue : comparaison entre un booléen et un entier
+// les types sont vérifiés une fois pour toutes, même sous un filtre
+array a[3] : bool;
+forall i in 1..3 { constraint i < 3 -> a[i] = 1; }

@@ -1,0 +1,4 @@
+// erreur attendue : 'Color' est un type, pas une valeur
+enum Color = { Red };
+var c : Color;
+constraint c = Color;

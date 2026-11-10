@@ -1,0 +1,3 @@
+// erreur attendue : nom non déclaré 'w'
+var x : bool;
+constraint x or w;

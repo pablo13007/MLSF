@@ -1,0 +1,3 @@
+// erreur attendue : la constante 'N' doit être un entier connu
+var x : 1..3;
+const N = x;

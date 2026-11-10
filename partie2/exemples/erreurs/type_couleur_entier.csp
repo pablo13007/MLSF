@@ -1,0 +1,4 @@
+// erreur attendue : comparaison entre une valeur de Color et un entier
+enum Color = { Red, Green };
+var c : Color;
+constraint c = 1;
