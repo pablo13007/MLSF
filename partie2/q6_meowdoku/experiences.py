@@ -16,7 +16,6 @@ Campagnes :
 import argparse
 import json
 import statistics
-from multiprocessing import Pool
 from pathlib import Path
 
 from commun import grille_generee, mesure
@@ -93,14 +92,8 @@ def resume(resultats):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--resume", action="store_true", help="synthèse du fichier de résultats")
-    ap.add_argument("--processus", type=int, default=4)
     args = ap.parse_args()
     if not args.resume:
-        liste = list(taches())
-        for n in sorted({t[0] for t in liste}):          # grilles créées avant le parallélisme
-            for g in GRAINES:
-                grille_generee(n, g)
-        with Pool(args.processus) as pool:
-            resultats = pool.map(executer, liste, chunksize=1)
+        resultats = [executer(t) for t in taches()]
         RESULTATS.write_text(json.dumps(resultats, indent=1), encoding="utf-8")
     resume(json.loads(RESULTATS.read_text(encoding="utf-8")))

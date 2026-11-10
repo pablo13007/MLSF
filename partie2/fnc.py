@@ -5,10 +5,10 @@
    « exactement une » : x_v1 ∨ ... ∨ x_vk, et ¬x_vi ∨ ¬x_vj pour i < j.
    Une variable bool reste une variable booléenne.
 
-2. Chaque contrainte de l'IR devient une formule propositionnelle en forme normale
-   négative (FNN), sur les littéraux DIMACS (to_prop). La polarité est propagée vers
-   le bas : une comparaison ou une contrainte globale sous une négation est traduite
-   directement sous sa forme niée.
+2. Chaque contrainte de l'IR devient une formule propositionnelle (and, or, littéraux)
+   sur les littéraux DIMACS (to_prop). La négation a déjà été poussée vers les feuilles
+   à la question 3 ; il ne reste que not b (b booléen), not (a = b) et not d'une
+   contrainte globale, traités par De Morgan sur la formule traduite (p_not).
 
    Comparaisons (x, y variables ; c valeur ; D(x) domaine de x) :
        x = c     x_c                         x != c    ¬x_c
@@ -25,24 +25,23 @@
        exactlyOne           les deux
        allDifferent(e1..en) pour chaque valeur v : atMostOne(e1 = v, ..., en = v)
 
-3. Mise en FNC de la formule FNN (question 1) : transformation de Tseitin, sous la
-   forme de Plaisted et Greenbaum. Une conjonction au sommet donne une clause par
-   conjoint ; une disjonction de littéraux est déjà une clause ; seule une conjonction
-   imbriquée dans une disjonction reçoit une variable auxiliaire a, avec les clauses
-   a -> conjoint. Dans une FNN, toute sous-formule apparaît positivement : l'implication
-   a -> φ suffit (l'équivalence de Tseitin n'est pas nécessaire), ce qui divise par deux
-   le nombre de clauses de définition. Une même sous-formule n'est définie qu'une fois.
+3. Mise en FNC (question 1) : transformation de Tseitin. Une conjonction au sommet donne
+   une clause par conjoint, et une disjonction de littéraux est déjà une clause : pas de
+   variable auxiliaire dans ces cas. Toute autre sous-formule φ reçoit une variable
+   auxiliaire a, avec les clauses de a <-> φ :
+       φ = l1 ∧ ... ∧ ln :  (¬a ∨ li) pour chaque i,  (a ∨ ¬l1 ∨ ... ∨ ¬ln)
+       φ = l1 ∨ ... ∨ ln :  (¬a ∨ l1 ∨ ... ∨ ln),     (a ∨ ¬li) pour chaque i
 
 Formules propositionnelles : int (littéral DIMACS), ("and", (...)), ("or", (...)), True, False.
 """
 
 from itertools import combinations
 
-from ir import Cell, Cmp, Glob, IAnd, IIff, INot, IOr, mk_not
+from ir import Cell, Cmp, Glob, IAnd, IIff, INot, IOr
 
 
 # ---------------------------------------------------------------------------
-# Formules propositionnelles en FNN
+# Formules propositionnelles
 # ---------------------------------------------------------------------------
 
 def p_and(xs):
@@ -82,7 +81,7 @@ def p_or(xs):
 
 
 def p_not(p):
-    """Négation d'une formule FNN (De Morgan) : le résultat est encore en FNN."""
+    """Négation d'une formule (De Morgan jusqu'aux littéraux)."""
     if isinstance(p, bool):
         return not p
     if isinstance(p, int):
@@ -106,7 +105,6 @@ class FNC:
         self._vues = set()
         self.lits = {}                # (Cell, code) -> numéro ; (Cell, None) pour un booléen
         self.noms = []                # (numéro, texte) des variables nommées
-        self._definitions = {}        # sous-formule -> variable auxiliaire
         self.nb_aux = 0
         for c in modele.cells:
             self.encoder_domaine(c)
@@ -148,32 +146,27 @@ class FNC:
         """Littéral x_v de la case c ; False si v n'est pas dans son domaine."""
         return self.lits.get((c, v), False)
 
-    # ------------------------------------------------ IR -> FNN
+    # ------------------------------------------------ IR -> formule propositionnelle
 
-    def to_prop(self, e, pol=True):
-        """Formule FNN équivalente à e (pol=True) ou à not e (pol=False)."""
+    def to_prop(self, e):
+        """Formule propositionnelle équivalente à e."""
         if isinstance(e, bool):
-            return e == pol
+            return e
         if isinstance(e, Cell):
-            n = self.lits[(e, None)]
-            return n if pol else -n
+            return self.lits[(e, None)]
         if isinstance(e, INot):
-            return self.to_prop(e.e, not pol)
-        if isinstance(e, (IAnd, IOr)):
-            conj = isinstance(e, IAnd) == pol
-            return (p_and if conj else p_or)([self.to_prop(x, pol) for x in e.es])
-        if isinstance(e, IIff):
+            return p_not(self.to_prop(e.e))
+        if isinstance(e, IAnd):
+            return p_and([self.to_prop(x) for x in e.es])
+        if isinstance(e, IOr):
+            return p_or([self.to_prop(x) for x in e.es])
+        if isinstance(e, IIff):          # (¬a ∨ b) ∧ (a ∨ ¬b)
             a, b = self.to_prop(e.a), self.to_prop(e.b)
-            if pol:          # (¬a ∨ b) ∧ (a ∨ ¬b)
-                return p_and([p_or([p_not(a), b]), p_or([a, p_not(b)])])
-            return p_and([p_or([a, b]), p_or([p_not(a), p_not(b)])])      # a xor b
+            return p_and([p_or([p_not(a), b]), p_or([a, p_not(b)])])
         if isinstance(e, Cmp):
-            if not pol:
-                return self.to_prop(mk_not(e, self.doms))  # x = y niée devient x != y, etc.
             return self.comparaison(e)
         if isinstance(e, Glob):
-            p = self.globale(e)
-            return p if pol else p_not(p)
+            return self.globale(e)
         raise TypeError(f"to_prop : nœud inattendu {e!r}")
 
     def comparaison(self, e):
@@ -212,7 +205,7 @@ class FNC:
         ls = [l for l in ls if l is not False]
         return p_and([p_or([p_not(a), p_not(b)]) for a, b in combinations(ls, 2)])
 
-    # ------------------------------------------------ FNN -> FNC (Tseitin / Plaisted-Greenbaum)
+    # ------------------------------------------------ formule -> FNC (Tseitin)
 
     def ajouter(self, f):
         p = self.to_prop(f)
@@ -225,22 +218,27 @@ class FNC:
             self.clause(self.en_clause(conj))
 
     def en_clause(self, p):
-        """Littéraux d'une clause équivalente (à définitions près) à p, un littéral ou un "or"."""
-        if isinstance(p, int):
-            return [p]
-        if p[0] == "and":
-            return [self.definir(p)]
-        return [l if isinstance(l, int) else self.definir(l) for l in p[1]]
+        """Clause équivalente (à définitions près) à p : un littéral, un "or" ou un "and"."""
+        if isinstance(p, tuple) and p[0] == "or":
+            return [self.litteral(x) for x in p[1]]
+        return [self.litteral(p)]
 
-    def definir(self, p):
-        """Variable auxiliaire a pour la conjonction p, avec les clauses a -> conjoint."""
-        if p not in self._definitions:
-            a = self.nouvelle()
-            self.nb_aux += 1
-            self._definitions[p] = a
-            for conj in p[1]:
-                self.clause([-a] + self.en_clause(conj))
-        return self._definitions[p]
+    def litteral(self, p):
+        """p lui-même si c'est un littéral, sinon sa variable auxiliaire de Tseitin."""
+        if isinstance(p, int):
+            return p
+        a = self.nouvelle()
+        self.nb_aux += 1
+        ls = [self.litteral(x) for x in p[1]]
+        if p[0] == "and":                                  # a <-> l1 ∧ ... ∧ ln
+            for l in ls:
+                self.clause([-a, l])
+            self.clause([a] + [-l for l in ls])
+        else:                                              # a <-> l1 ∨ ... ∨ ln
+            self.clause([-a] + ls)
+            for l in ls:
+                self.clause([a, -l])
+        return a
 
     # ------------------------------------------------ DIMACS et décodage
 

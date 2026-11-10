@@ -1,9 +1,9 @@
 """Chaîne complète (questions 1 et 5) : texte -> AST -> modèle déroulé -> FNC -> DIMACS
 -> solveur de la partie I -> valeurs des variables du modèle.
 
-Le solveur est celui de la partie I, réutilisé tel quel : DPLL avec heuristique de
-branchement (heuristiques.dpll_h), H4 dynamique par défaut (retenue en partie I,
-question 5). Le passage par un fichier DIMACS, relu par lire_dimacs de la partie I,
+Le solveur est celui de la partie I, réutilisé tel quel : DPLL avec l'heuristique de
+branchement H4 dynamique (heuristiques.dpll_h et h4_vfcm), retenue en partie I,
+question 5. Le passage par un fichier DIMACS, relu par lire_dimacs de la partie I,
 fait de ce fichier l'unique interface entre le compilateur et le solveur.
 """
 
@@ -25,7 +25,7 @@ PARTIE1 = Path(__file__).resolve().parent.parent / "partie1" / "Session de trava
 sys.path.insert(0, str(PARTIE1))
 
 from dpll import completer, lire_dimacs, verifier_modele          # noqa: E402  (partie I)
-from heuristiques import HEURISTIQUES, dpll_h                      # noqa: E402  (partie I)
+from heuristiques import dpll_h, h4_vfcm                           # noqa: E402  (partie I)
 
 sys.setrecursionlimit(100_000)
 
@@ -56,11 +56,11 @@ def compiler(texte):
     return modele, FNC(modele)
 
 
-def resoudre_dimacs(chemin, heur="H4"):
+def resoudre_dimacs(chemin):
     """Résout un fichier DIMACS avec le solveur de la partie I ; renvoie l'ensemble des
     variables vraies, ou None si la formule est insatisfiable."""
     nb_vars, clauses = lire_dimacs(chemin)
-    sat, v = dpll_h(clauses, HEURISTIQUES[heur])
+    sat, v = dpll_h(clauses, h4_vfcm)
     if not sat:
         return None
     modele = completer(v, nb_vars)
@@ -69,7 +69,7 @@ def resoudre_dimacs(chemin, heur="H4"):
     return {l for l in modele if l > 0}
 
 
-def resoudre(modele, fnc, chemin_dimacs=None, heur="H4", commentaires=()):
+def resoudre(modele, fnc, chemin_dimacs=None, commentaires=()):
     """Écrit la FNC, appelle le solveur, décode et vérifie la solution.
 
     Renvoie None (insatisfiable) ou le dictionnaire Cell -> valeur (bool ou code).
@@ -82,7 +82,7 @@ def resoudre(modele, fnc, chemin_dimacs=None, heur="H4", commentaires=()):
     try:
         with open(chemin_dimacs, "w", encoding="utf-8") as f:
             f.write(fnc.dimacs(commentaires))
-        vraies = resoudre_dimacs(chemin_dimacs, heur)
+        vraies = resoudre_dimacs(chemin_dimacs)
     finally:
         if temporaire:
             os.remove(chemin_dimacs)

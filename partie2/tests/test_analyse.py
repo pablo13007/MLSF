@@ -84,12 +84,9 @@ def test_normalisation():
                     "constraint x > y;"               # y < x
                     "constraint x < 5;"               # x <= 4
                     "constraint 3 <= x;"              # x >= 3
-                    "constraint x <= 100;"            # toujours vraie (domaine) : disparaît
                     "constraint not (x < y);"         # y <= x
-                    "constraint x >= 9;"              # une seule valeur : x = 9
                     "constraint not (x = 1 and y = 2);")   # De Morgan
-    assert cs == ["x != 2", "y < x", "x <= 4", "x >= 3", "y <= x", "x = 9",
-                  "(x != 1 or y != 2)"]
+    assert cs == ["x != 2", "y < x", "x <= 4", "x >= 3", "y <= x", "(x != 1 or y != 2)"]
 
 
 def test_court_circuit_et_simplification():

@@ -17,10 +17,6 @@ Seule dépendance : `lark` (voir `../requirements.txt`).
 python csp.py exemples/sudoku.csp                  # FNC au format DIMACS sur la sortie standard
 python csp.py exemples/sudoku.csp --dimacs f.cnf   # FNC écrite dans f.cnf
 python csp.py exemples/sudoku.csp --solve          # résolution : s SATISFIABLE + « nom = valeur »
-python csp.py exemples/queens.csp --ast            # arbre de syntaxe abstraite
-python csp.py exemples/queens.csp --deroule        # contraintes déroulées et simplifiées
-python csp.py exemples/queens.csp --solve --stats  # tailles et temps sur stderr
-python csp.py exemples/queens.csp --solve --heur H1   # autre heuristique de la partie I
 ```
 
 L'interface est celle conseillée par l'énoncé. Avec `--solve`, la sortie est `s SATISFIABLE`
@@ -63,7 +59,7 @@ for t in syntax analyse fnc exemples meowdoku; do python -m tests.test_$t; done
 python q6_meowdoku/grille_vers_csp.py grille.txt --regles q6_meowdoku/regles/modele2.csp -o g.csp   # 6.1
 python csp.py g.csp --solve | python q6_meowdoku/verifier.py grille.txt   # vérificateur indépendant
 python q6_meowdoku/resoudre_grilles.py      # 6.2 : grilles résolues avec chaque modèle et vérifiées
-python q6_meowdoku/experiences.py           # 6.3, 6.4 : campagne de mesures -> resultats_q6.json (~15 min)
+python q6_meowdoku/experiences.py           # 6.3, 6.4 : campagne de mesures -> resultats_q6.json (~1 h)
 python q6_meowdoku/experiences.py --resume  # tableaux de synthèse
 python q6_meowdoku/exhaustif.py             # 6.5 : modèle généralisé contre une recherche exhaustive
 ```

@@ -16,11 +16,11 @@ Les valeurs énumérées sont numérotées 0, 1, ... dans l'ordre de déclaratio
 (code entier) ; les comparaisons portent sur ces codes.
 
 Les constructeurs mk_* simplifient au passage : constantes True/False absorbées,
-négation poussée dans les comparaisons (not (x = 2) devient x != 2), comparaisons
-tranchées par le domaine (x = 10 avec x dans 1..9 devient False).
+négation poussée jusqu'aux feuilles (De Morgan, not (x = 2) devient x != 2),
+comparaisons normalisées (x > y devient y < x, x < 3 devient x <= 2).
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -42,12 +42,10 @@ class Dom:
 @dataclass(frozen=True)
 class Cell:
     name: str
-    idx: tuple
-    # affichage des indices (noms des valeurs énumérées) ; n'entre pas dans l'égalité
-    labels: tuple = field(default=(), compare=False)
+    idx: tuple                  # indices : entiers ou valeurs énumérées
 
     def __str__(self):
-        return self.name + "".join(f"[{s}]" for s in (self.labels or self.idx))
+        return self.name + "".join(f"[{v}]" for v in self.idx)
 
 
 @dataclass(frozen=True)
@@ -82,31 +80,29 @@ class Glob:
 # ---------------------------------------------------------------------------
 # Constructeurs simplificateurs
 # ---------------------------------------------------------------------------
-# doms : dictionnaire Cell -> Dom, nécessaire pour trancher les comparaisons.
-
-def mk_not(e, doms):
+def mk_not(e):
     if isinstance(e, bool):
         return not e
     if isinstance(e, INot):
         return e.e
     if isinstance(e, Cmp):
         if isinstance(e.y, Cell):
-            return _neg_var_var(e, doms)
-        return mk_cmp(NEGATION[e.op], e.x, e.y, doms)
+            return _neg_var_var(e)
+        return mk_cmp(NEGATION[e.op], e.x, e.y)
     if isinstance(e, IAnd):                           # De Morgan : la négation descend
-        return mk_or([mk_not(x, doms) for x in e.es])
+        return mk_or([mk_not(x) for x in e.es])
     if isinstance(e, IOr):
-        return mk_and([mk_not(x, doms) for x in e.es])
+        return mk_and([mk_not(x) for x in e.es])
     return INot(e)                                    # variable booléenne, IIff ou Glob
 
 NEGATION = {"=": "!=", "!=": "=", "<=": ">", ">=": "<", "<": ">=", ">": "<="}
 
 
-def _neg_var_var(e, doms):
+def _neg_var_var(e):
     # not (x = y) : x != y ; not (x < y) : y <= x ; not (x <= y) : y < x
     if e.op in ("=", "!="):
-        return mk_cmp(NEGATION[e.op], e.x, e.y, doms)
-    return mk_cmp("<=" if e.op == "<" else "<", e.y, e.x, doms)
+        return mk_cmp(NEGATION[e.op], e.x, e.y)
+    return mk_cmp("<=" if e.op == "<" else "<", e.y, e.x)
 
 
 def mk_and(es):
@@ -135,16 +131,14 @@ def mk_or(es):
     return out[0] if len(out) == 1 else IOr(tuple(out))
 
 
-def mk_iff(a, b, doms):
+def mk_iff(a, b):
     """a = b entre deux expressions booléennes."""
     if isinstance(a, bool) and isinstance(b, bool):
         return a == b
     if isinstance(a, bool):
         a, b = b, a
     if isinstance(b, bool):
-        return a if b else mk_not(a, doms)
-    if a == b:
-        return True
+        return a if b else mk_not(a)
     return IIff(a, b)
 
 
@@ -156,31 +150,20 @@ def compare_values(op, a, b):
 FLIP = {"=": "=", "!=": "!=", "<": ">", "<=": ">=", ">": "<", ">=": "<="}
 
 
-def mk_cmp(op, a, b, doms):
+def mk_cmp(op, a, b):
     """Comparaison entre deux termes entiers ou énumérés : valeur connue (int) ou Cell."""
     if not isinstance(a, Cell) and not isinstance(b, Cell):
         return compare_values(op, a, b)
     if not isinstance(a, Cell):                       # c op x  ->  x op' c
         a, b, op = b, a, FLIP[op]
     if isinstance(b, Cell):
-        if a == b:                                    # x op x
-            return op in ("=", "<=", ">=")
         if op in (">", ">="):                         # x > y  ->  y < x
             a, b, op = b, a, FLIP[op]
         return Cmp(op, a, b)
-    # variable-valeur : < et > deviennent <= et >= ; le domaine tranche si possible
-    if op == "<":
+    if op == "<":                                     # variable-valeur : x < c  ->  x <= c-1
         op, b = "<=", b - 1
-    elif op == ">":
+    elif op == ">":                                   # x > c  ->  x >= c+1
         op, b = ">=", b + 1
-    values = doms[a].values
-    ok = [v for v in values if compare_values(op, v, b)]
-    if len(ok) == len(values):
-        return True
-    if not ok:
-        return False
-    if op in ("<=", ">=") and len(ok) == 1:           # une seule valeur possible : x = v
-        return Cmp("=", a, ok[0])
     return Cmp(op, a, b)
 
 

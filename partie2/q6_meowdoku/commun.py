@@ -41,20 +41,20 @@ def grille_generee(n, graine):
     return chemin
 
 
-def sortie_solve(texte, heur="H4"):
+def sortie_solve(texte):
     """Sortie de `csp.py --solve` pour le modèle texte (même format, calculée sur place)."""
     m, fnc = compiler(texte)
-    val = resoudre(m, fnc, heur=heur)
+    val = resoudre(m, fnc)
     if val is None:
         return "s UNSATISFIABLE\n"
     return "s SATISFIABLE\n" + "\n".join(afficher(m, val)) + "\n"
 
 
-def resoudre_et_verifier(chemin_grille, nom_modele, heur="H4"):
+def resoudre_et_verifier(chemin_grille, nom_modele):
     """(statut, erreurs du vérificateur indépendant, durée) pour une grille et un modèle."""
     texte = modele(str(chemin_grille), MODELES[nom_modele])
     t0 = time.perf_counter()
-    sortie = sortie_solve(texte, heur)
+    sortie = sortie_solve(texte)
     duree = time.perf_counter() - t0
     statut = sortie.split("\n", 1)[0][2:]
     erreurs = verifier(lire_grille(str(chemin_grille)), sortie) if statut == "SATISFIABLE" else []

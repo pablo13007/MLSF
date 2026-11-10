@@ -44,7 +44,7 @@ def derouler(program, table):
             for d in sym.dims:
                 idxs = [i + (v,) for i in idxs for v in d.values]
         for idx in idxs:
-            c = Cell(name, idx, tuple(str(v) for v in idx))
+            c = Cell(name, idx)
             cells.append(c)
             doms[c] = sym.dom
     m = Modele(cells, doms)
@@ -140,7 +140,7 @@ class Evaluateur:
                         for k, (i, d) in enumerate(zip(e.indices, sym.dims), 1))
             if isinstance(sym, ConstArray):
                 return sym.data[idx]
-            return Cell(e.name, idx, tuple(str(v) for v in idx))
+            return Cell(e.name, idx)
 
         if isinstance(e, BinOp):
             a, b = self.valeur(e.left, env), self.valeur(e.right, env)
@@ -150,7 +150,7 @@ class Evaluateur:
 
         # connecteurs : évaluation paresseuse de gauche à droite
         if isinstance(e, Not):
-            return mk_not(self.valeur(e.expr, env), self.doms)
+            return mk_not(self.valeur(e.expr, env))
         if isinstance(e, And):
             a = self.valeur(e.left, env)
             if a is False:
@@ -165,16 +165,16 @@ class Evaluateur:
             a = self.valeur(e.left, env)
             if a is False:
                 return True
-            return mk_or([mk_not(a, self.doms), self.valeur(e.right, env)])
+            return mk_or([mk_not(a), self.valeur(e.right, env)])
 
         if isinstance(e, Compare):
             a, b = self.valeur(e.left, env), self.valeur(e.right, env)
             if is_formula(a, self.doms) or is_formula(b, self.doms):
-                r = mk_iff(a, b, self.doms)
-                return r if e.op == "=" else mk_not(r, self.doms)
+                r = mk_iff(a, b)
+                return r if e.op == "=" else mk_not(r)
             x = a if isinstance(a, Cell) else code(a)     # entiers et valeurs énumérées :
             y = b if isinstance(b, Cell) else code(b)     # comparaison des codes
-            return mk_cmp(e.op, x, y, self.doms)
+            return mk_cmp(e.op, x, y)
 
         if isinstance(e, Call):
             if e.name == "abs":
@@ -204,16 +204,15 @@ class Evaluateur:
             idxs = [x + (v,) for x in idxs for v in vs]           # ordre ligne par ligne
         if isinstance(sym, ConstArray):
             return [sym.data[x] for x in idxs]
-        return [Cell(a.name, x, tuple(str(v) for v in x)) for x in idxs]
+        return [Cell(a.name, x) for x in idxs]
 
     def globale(self, name, items):
-        doms = self.doms
         if name == "allDifferent":
             known = [code(x) for x in items if not isinstance(x, Cell)]
             cells = [x for x in items if isinstance(x, Cell)]
             if len(set(known)) < len(known) or len(set(cells)) < len(cells):
                 return False                      # deux fois la même valeur, ou la même case
-            parts = [mk_cmp("!=", c, k, doms) for c in cells for k in sorted(set(known))]
+            parts = [mk_cmp("!=", c, k) for c in cells for k in sorted(set(known))]
             if len(cells) >= 2:
                 parts.append(Glob("allDifferent", tuple(cells)))
             return mk_and(parts)
@@ -224,7 +223,7 @@ class Evaluateur:
         if vrais >= 2:                            # atMostOne, exactlyOne
             return False
         if vrais == 1:
-            return mk_and([mk_not(x, doms) for x in reste])
+            return mk_and([mk_not(x) for x in reste])
         if name == "atMostOne":
             return True if len(reste) <= 1 else Glob(name, tuple(reste))
         # exactlyOne sans argument vrai

@@ -37,9 +37,7 @@ ligne de commande & \code{csp.py} & \\
 L'interface est celle conseillée par l'énoncé (depuis \code{partie2/}) :
 \code{python csp.py m.csp} écrit la FNC au format DIMACS sur la sortie standard,
 \code{--dimacs f.cnf} l'écrit dans un fichier, et \code{--solve} affiche \code{s SATISFIABLE}
-suivi d'une ligne \code{nom = valeur} par variable, ou \code{s UNSATISFIABLE}. Nous avons
-ajouté \code{--ast} (arbre de syntaxe), \code{--deroule} (contraintes déroulées), \code{--stats}
-(tailles et temps) et \code{--heur} (heuristique du solveur, H4 par défaut). Les tests se
+suivi d'une ligne \code{nom = valeur} par variable, ou \code{s UNSATISFIABLE}. Les tests se
 lancent par \code{python -m tests.test\_X} pour X parmi \code{syntax}, \code{analyse},
 \code{fnc}, \code{exemples}, \code{meowdoku}. Le dossier \code{q6\_meowdoku/} contient les
 programmes de la question 6.
@@ -54,22 +52,18 @@ langage. Le fragment y est un cas particulier, celui où toutes les variables so
 \paragraph{Table des symboles.} \code{constraint w;} est rejeté si \code{w} n'est pas déclaré
 (\og nom non déclaré 'w' \fg). La table a été étendue à la question 3.
 
-\paragraph{Mise en FNC.} Chaque contrainte est d'abord mise en forme normale négative (FNN) :
-la négation descend jusqu'aux littéraux, et \code{a -> b} devient $\neg a \vee b$. On applique
-ensuite la transformation de Tseitin, sous la forme de Plaisted et Greenbaum.
+\paragraph{Mise en FNC.} \code{a -> b} est réécrit en $\neg a \vee b$, et la négation est
+poussée jusqu'aux littéraux par les lois de De Morgan. On applique ensuite la transformation
+de Tseitin.
 \begin{itemize}
   \item Une conjonction au sommet donne une clause par conjoint. Une disjonction de littéraux
         est déjà une clause : \code{a -> b}, \code{not (a and b)}, \code{(a and b) -> c} ne
         coûtent aucune variable auxiliaire.
-  \item Seule une conjonction $\varphi$ imbriquée dans une disjonction reçoit une variable
-        auxiliaire $a$, avec les clauses $\neg a \vee \psi$ pour chaque conjoint $\psi$ de
-        $\varphi$.
-  \item Dans une FNN, toute sous-formule apparaît positivement. L'implication $a \to \varphi$
-        suffit donc : un modèle de la FNC rend vraie la formule (monotonie), et un modèle de la
-        formule se prolonge en posant $a = \varphi$. On économise ainsi la moitié des clauses de
-        définition de Tseitin.
-  \item Une sous-formule identique n'est définie qu'une fois, et les clauses en double ou
-        tautologiques sont supprimées.
+  \item Toute autre sous-formule $\varphi$ reçoit une variable auxiliaire $a$, avec les
+        clauses de $a \leftrightarrow \varphi$. Pour $\varphi = l_1 \wedge \dots \wedge l_n$ :
+        $\neg a \vee l_i$ pour chaque $i$, et $a \vee \neg l_1 \vee \dots \vee \neg l_n$. Pour
+        une disjonction, les clauses symétriques.
+  \item Les clauses en double ou tautologiques sont supprimées.
 \end{itemize}
 
 \paragraph{Noms des variables.} Le fichier DIMACS commence par des commentaires
@@ -80,18 +74,12 @@ ensuite la transformation de Tseitin, sous la forme de Plaisted et Greenbaum.
 aléatoires (3 booléens, 1 à 3 contraintes de profondeur 1 à 3, avec \code{not}, \code{and},
 \code{or}, \code{->}, \code{=} et \code{!=} entre booléens et les contraintes globales). Un
 évaluateur de l'AST, écrit dans le test indépendamment du compilateur, fournit la réponse par
-recherche exhaustive. Trois propriétés sont vérifiées :
+recherche exhaustive. Deux propriétés sont vérifiées :
 \begin{enumerate}
   \item la FNC est satisfiable si et seulement si le modèle l'est ;
-  \item la restriction d'un modèle de la FNC aux variables nommées est une solution du modèle ;
-  \item pour \emph{chaque} valuation des variables nommées, la FNC complétée par les clauses
-        unitaires qui fixent ces variables est satisfiable si et seulement si la valuation est
-        une solution. Les variables auxiliaires n'ajoutent ni ne retirent donc aucune solution.
+  \item la restriction d'un modèle de la FNC aux variables nommées est une solution du modèle.
 \end{enumerate}
-300 modèles sont testés, dont 100 pour la propriété 3. Le test étendu aux domaines finis
-(question 4) en ajoute 300 autres. Pour vérifier que ce filet attrape réellement les
-erreurs, nous avons injecté deux erreurs dans \code{fnc.py} : une inégalité stricte traduite
-comme large, et un littéral oublié dans les clauses. Les deux ont été détectées.
+300 modèles sont testés. Le test étendu aux domaines finis (question 4) en ajoute 300 autres.
 
 %======================================================================
 \section{Question 2 -- Analyse syntaxique}
@@ -135,7 +123,7 @@ qui commence par un mot-clé (\code{index}, \code{order}) reste un nom.
 \code{Forall}, \code{RangeDomain}, \code{EnumDomain} (\code{bool} compris), et pour les
 expressions \code{Var}, \code{IntLit}, \code{Not}, \code{And}, \code{Or}, \code{Implies},
 \code{Compare}, \code{BinOp}, \code{Neg}, \code{Access}, \code{Wildcard}, \code{Call}. Les
-classes du code de départ sont conservées. \code{pretty} affiche l'arbre (\code{--ast}) en
+classes du code de départ sont conservées. \code{pretty} affiche l'arbre en
 parenthésant chaque opérateur ; \code{source} réécrit le modèle en texte entièrement
 parenthésé.
 
@@ -199,8 +187,6 @@ Les simplifications appliquées :
         \code{not (x < y)} donne \code{y <= x} ;
   \item \code{x > y} réécrit en \code{y < x}, \code{x < c} en \code{x <= c-1}, \code{c < x}
         en \code{x >= c+1} ;
-  \item comparaisons tranchées par le domaine : \code{x = 10} avec \code{x} dans \code{1..9}
-        donne faux, \code{x <= 100} donne vrai, \code{x >= 9} donne \code{x = 9} ;
   \item tranches remplacées par la liste de leurs cases, ligne par ligne ;
   \item arguments connus des globales simplifiés (un argument vrai dans \code{atMostOne}
         force les autres à faux, deux valeurs égales dans \code{allDifferent} donnent faux,
@@ -237,10 +223,10 @@ variables booléennes $x_{v}$, avec la clause \og au moins une \fg{} et les $k(k
 \og au plus une \fg. Pour \code{var x : 1..3;}, on obtient exactement les 4 clauses de
 l'énoncé (test). Les valeurs énumérées sont numérotées dans l'ordre de déclaration.
 
-\paragraph{Polarité.} La traduction (\code{FNC.to\_prop}) produit directement une FNN et
-transmet la polarité vers le bas. Une comparaison niée est traduite sous sa forme niée
-(\code{x = y} niée devient \code{x != y}), plutôt que comme la négation de sa traduction. On
-garde ainsi, dans les deux polarités, une traduction en clauses, sans variable auxiliaire.
+\paragraph{Négations.} La question 3 a déjà poussé la négation jusqu'aux comparaisons
+(\code{not (x = y)} est devenu \code{x != y}). Il ne reste que la négation d'un booléen, d'une
+égalité entre booléens ou d'une contrainte globale : on traduit l'expression, puis on nie la
+formule obtenue par De Morgan.
 
 \paragraph{Comparaisons.} Toutes les traductions s'appuient sur les clauses \og exactement
 une \fg{} des domaines. Notons $k = |D(x)|$.
@@ -249,7 +235,7 @@ une \fg{} des domaines. Notons $k = |D(x)|$.
 \toprule
 comparaison & traduction retenue & taille \\
 \midrule
-\code{x = c}, \code{x != c} & $x_c$, $\neg x_c$ & 1 littéral \\
+\code{x = c}, \code{x != c} & $x_c$, $\neg x_c$ (faux, vrai si $c \notin D(x)$) & 1 littéral \\
 \code{x <= c} & $\bigvee_{v \le c} x_v$ & 1 clause \\
 \code{x >= c} & $\bigvee_{v \ge c} x_v$ & 1 clause \\
 \code{x = y} & $\bigwedge_{v} (\neg x_v \vee y_v)$ & $k$ clauses binaires \\

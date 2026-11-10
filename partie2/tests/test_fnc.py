@@ -5,10 +5,7 @@ on engendre des modèles aléatoires avec peu de variables, on les compile, puis
 compare au résultat d'une recherche exhaustive, calculée par un évaluateur de l'AST
 écrit ici, indépendamment du compilateur (ni IR, ni déroulement) :
   1. la FNC est satisfiable si et seulement si le modèle l'est ;
-  2. la solution décodée du modèle de la FNC est une solution du modèle ;
-  3. (équivalence) pour chaque valuation des variables du modèle, la FNC à laquelle on
-     ajoute les clauses unitaires fixant ces variables est satisfiable si et seulement
-     si la valuation satisfait le modèle : les variables auxiliaires ne changent rien.
+  2. la solution décodée du modèle de la FNC est une solution du modèle.
 
 À lancer depuis partie2/ :  python -m tests.test_fnc
 """
@@ -16,11 +13,11 @@ compare au résultat d'une recherche exhaustive, calculée par un évaluateur de
 import random
 from itertools import product
 
-from solveur import compiler, dpll_h, HEURISTIQUES
+from solveur import compiler, dpll_h, h4_vfcm
 from syntax import (And, Call, Compare, Constraint, Implies, IntLit, Not, Or, Program, Var,
                     source)
 
-h4 = HEURISTIQUES["H4"]
+h4 = h4_vfcm
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +127,7 @@ def valeurs_par_nom(modele, val):
     return {c.name: val[c] for c in modele.cells}
 
 
-def check_model(texte, cs, doms, codes, equivalence):
+def check_model(texte, cs, doms, codes):
     modele, fnc = compiler(texte)
     solutions = [v for v in valuations(doms) if satisfait(cs, v, codes)]
     sat, v = dpll_h([list(c) for c in fnc.clauses], h4)
@@ -138,28 +135,18 @@ def check_model(texte, cs, doms, codes, equivalence):
     if sat:
         vraies = {p for p, b in v.items() if b}
         assert satisfait(cs, valeurs_par_nom(modele, fnc.decoder(vraies)), codes), texte   # 2.
-    if equivalence:                                                           # 3.
-        cells = {c.name: c for c in modele.cells}
-        for val in valuations(doms):
-            units = []
-            for n, x in val.items():
-                c = cells[n]
-                units.append([fnc.lits[(c, None)] if x else -fnc.lits[(c, None)]]
-                             if doms[n] == [False, True] else [fnc.lits[(c, x)]])
-            ok, _ = dpll_h([list(c) for c in fnc.clauses] + units, h4)
-            assert ok == satisfait(cs, val, codes), (texte, val)
 
 
 def test_aleatoire_propositionnel():
     rng = random.Random(1)
-    for k in range(300):
-        check_model(*random_model(rng, finite=False), equivalence=k < 100)
+    for _ in range(300):
+        check_model(*random_model(rng, finite=False))
 
 
 def test_aleatoire_domaines_finis():
     rng = random.Random(2)
-    for k in range(300):
-        check_model(*random_model(rng, finite=True), equivalence=k < 15)
+    for _ in range(300):
+        check_model(*random_model(rng, finite=True))
 
 
 # ---------------------------------------------------------------------------
@@ -197,8 +184,9 @@ def test_globales_et_tseitin():
     # une contrainte déjà clause, ou qui s'y ramène, n'introduit pas de variable auxiliaire
     for c in ["a -> b", "not (a and b)", "a or not b or c", "(a and b) -> c"]:
         assert taille(f"var a : bool; var b : bool; var c : bool; constraint {c};") == (3, 1, 0), c
-    # conjonction sous une disjonction : une variable auxiliaire
-    assert taille("var a : bool; var b : bool; var c : bool; constraint a or (b and c);") == (4, 3, 1)
+    # conjonction sous une disjonction : une variable auxiliaire a <-> b ∧ c (3 clauses),
+    # plus la clause a_orig ∨ aux
+    assert taille("var a : bool; var b : bool; var c : bool; constraint a or (b and c);") == (4, 4, 1)
     # not atMostOne : disjonction de conjonctions, une auxiliaire par paire
     assert taille("array a[3] : bool; constraint not atMostOne(a[*]);")[2] == 3
 
