@@ -1,0 +1,4 @@
+// erreur attendue : seules = et != s'appliquent aux booléens
+var b : bool;
+var c : bool;
+constraint b < c;

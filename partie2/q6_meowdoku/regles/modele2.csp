@@ -1,0 +1,19 @@
+// Règles de Meowdoku, second modèle (N = M = K) : une variable booléenne par case.
+
+array cat[N][M] : bool;
+
+// exactement un chat par ligne et par colonne (N = M = K)
+forall i in 1..N { constraint exactlyOne(cat[i][*]); }
+forall j in 1..M { constraint exactlyOne(cat[*][j]); }
+
+// pas deux chats voisins (en diagonale : lignes et colonnes sont exclusives)
+forall i in 1..(N - 1), j in 1..M, l in (j - 1)..(j + 1) {
+    constraint l >= 1 and l <= M and l != j -> not (cat[i][j] and cat[i + 1][l]);
+}
+
+// au plus un chat par région (question 6.2) : deux cases distinctes d'une même région,
+// prises dans l'ordre ligne par ligne, ne portent pas toutes deux un chat
+forall i1 in 1..N, j1 in 1..M, i2 in 1..N, j2 in 1..M {
+    constraint (i1 < i2 or (i1 = i2 and j1 < j2)) and region[i1][j1] = region[i2][j2]
+               -> not (cat[i1][j1] and cat[i2][j2]);
+}

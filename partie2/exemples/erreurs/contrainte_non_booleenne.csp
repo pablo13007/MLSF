@@ -1,0 +1,3 @@
+// erreur attendue : est un entier, pas un booléen
+var x : 1..3;
+constraint x;

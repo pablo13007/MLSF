@@ -1,0 +1,3 @@
+// erreur attendue : l'indice 1 de 'a' vaut 4, hors de 1..3
+array a[3] : bool;
+constraint a[4];

@@ -1,0 +1,3 @@
+// erreur attendue : 'N' est déjà déclaré
+const N = 3;
+var N : bool;

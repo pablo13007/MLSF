@@ -1,0 +1,3 @@
+// erreur attendue : erreur de syntaxe sur 'in'
+// 'in' est un mot-clé réservé
+var in : bool;

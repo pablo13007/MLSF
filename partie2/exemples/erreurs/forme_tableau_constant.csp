@@ -1,0 +1,2 @@
+// erreur attendue : les données de 't' n'ont pas la forme [1..2][1..2]
+const t[2][2] = [[1, 2], [3]];

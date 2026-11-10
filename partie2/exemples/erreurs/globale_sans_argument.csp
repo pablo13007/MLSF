@@ -1,0 +1,2 @@
+// erreur attendue : exactlyOne attend au moins un argument
+constraint exactlyOne();

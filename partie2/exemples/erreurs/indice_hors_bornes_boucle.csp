@@ -1,0 +1,4 @@
+// erreur attendue : hors de 1..3 (dans 'a[(i + 1)]') (pour i = 3)
+// l'accès a[i + 1] n'est protégé par aucun filtre
+array a[3] : bool;
+forall i in 1..3 { constraint a[i + 1] or a[i]; }

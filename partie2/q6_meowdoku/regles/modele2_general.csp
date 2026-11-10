@@ -1,0 +1,28 @@
+// Règles de Meowdoku, second modèle généralisé (question 6.5) : N, M et K quelconques.
+// Règles de la partie I : au plus un chat par ligne et par colonne, exactement un
+// chat par région, pas deux chats voisins (y compris en diagonale).
+
+array cat[N][M] : bool;
+
+// au plus un chat par ligne et par colonne (exactement un n'est plus vrai si K < N ou K < M)
+forall i in 1..N { constraint atMostOne(cat[i][*]); }
+forall j in 1..M { constraint atMostOne(cat[*][j]); }
+
+// pas deux chats voisins : sur une même ligne ou une même colonne, c'est déjà exclu ;
+// restent les diagonales
+forall i in 1..(N - 1), j in 1..M, l in (j - 1)..(j + 1) {
+    constraint l >= 1 and l <= M and l != j -> not (cat[i][j] and cat[i + 1][l]);
+}
+
+// au plus un chat par région
+forall i1 in 1..N, j1 in 1..M, i2 in 1..N, j2 in 1..M {
+    constraint (i1 < i2 or (i1 = i2 and j1 < j2)) and region[i1][j1] = region[i2][j2]
+               -> not (cat[i1][j1] and cat[i2][j2]);
+}
+
+// au moins un chat par région : n'est plus redondant (voir modele2_redondant.csp)
+array inzone[Zone][N][M] : bool;
+forall z in Zone, i in 1..N, j in 1..M {
+    constraint inzone[z][i][j] = (region[i][j] = z and cat[i][j]);
+}
+forall z in Zone { constraint atLeastOne(inzone[z][*][*]); }
