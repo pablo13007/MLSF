@@ -1,0 +1,4 @@
+// erreur attendue : allDifferent attend des entiers ou des valeurs énumérées
+var b : bool;
+var c : bool;
+constraint allDifferent(b, c);

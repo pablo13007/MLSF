@@ -19,3 +19,5 @@ __pycache__/
 
 *.txt
 *.cnf
+# Partie II : grilles engendrées par q6_meowdoku (régénérables)
+partie2/q6_meowdoku/grilles/

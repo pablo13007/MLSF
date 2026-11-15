@@ -1,0 +1,3 @@
+// erreur attendue : fonction inconnue 'sum'
+array a[3] : bool;
+constraint sum(a[*]);

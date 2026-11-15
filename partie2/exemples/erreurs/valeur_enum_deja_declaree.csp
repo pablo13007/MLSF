@@ -1,0 +1,3 @@
+// erreur attendue : 'Red' est déjà déclaré
+enum Color = { Red, Green };
+var Red : bool;

@@ -1,0 +1,3 @@
+// erreur attendue : il faut 1 indice(s)
+array a[2] : bool;
+constraint a;

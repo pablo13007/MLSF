@@ -1,0 +1,4 @@
+// erreur attendue : l'indice 1 de 'u[1]' doit être une valeur de Color, pas un entier
+enum Color = { Red, Green };
+array u[Color] : bool;
+constraint u[1];

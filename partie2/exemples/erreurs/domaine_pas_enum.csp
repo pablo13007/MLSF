@@ -1,0 +1,3 @@
+// erreur attendue : 'N' n'est pas un type énuméré
+const N = 3;
+var c : N;

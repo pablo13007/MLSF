@@ -1,0 +1,4 @@
+// erreur attendue : arithmétique sur un booléen
+var b : bool;
+var x : 1..3;
+constraint x = b + 1;

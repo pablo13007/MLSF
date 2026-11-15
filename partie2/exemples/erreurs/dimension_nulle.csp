@@ -1,0 +1,2 @@
+// erreur attendue : la dimension 1 de 'a' vaut 0
+array a[0] : bool;

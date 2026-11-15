@@ -1,0 +1,35 @@
+// Données de la grille grille_enonce.txt
+const N = 6;    // lignes
+const M = 6;    // colonnes
+const K = 6;    // régions
+enum Zone = { A, B, C, D, E, F };
+const region[N][M] = [
+    [A, B, C, B, B, D],
+    [A, B, B, B, B, D],
+    [A, A, B, D, D, D],
+    [A, A, A, E, D, D],
+    [A, A, A, A, D, D],
+    [F, A, D, D, D, D]
+];
+
+// Règles de Meowdoku, premier modèle (N = M = K) : la position du chat de chaque région.
+// row[z], col[z] : ligne et colonne du chat de la région z.
+
+array row[Zone] : 1..N;
+array col[Zone] : 1..M;
+
+// au plus un chat par ligne et par colonne
+constraint allDifferent(row[*]);
+constraint allDifferent(col[*]);
+
+// le chat de la région z est dans la région z
+forall z in Zone, i in 1..N, j in 1..M {
+    constraint region[i][j] != z -> not (row[z] = i and col[z] = j);
+}
+
+// pas deux chats voisins (en diagonale : lignes et colonnes sont distinctes)
+forall z1 in Zone, z2 in Zone, i in 1..N, j in 1..M,
+       k in (i - 1)..(i + 1), l in (j - 1)..(j + 1) {
+    constraint z1 < z2 and k != i and l != j
+               -> not (row[z1] = i and col[z1] = j and row[z2] = k and col[z2] = l);
+}

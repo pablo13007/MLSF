@@ -1,0 +1,2 @@
+// erreur attendue : le domaine 3..1 de 'x' est vide
+var x : 3..1;

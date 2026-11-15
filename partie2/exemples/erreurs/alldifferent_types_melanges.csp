@@ -1,0 +1,5 @@
+// erreur attendue : allDifferent : arguments de types différents
+enum Color = { Red, Green };
+var c : Color;
+var x : 1..2;
+constraint allDifferent(c, x);

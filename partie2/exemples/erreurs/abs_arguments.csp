@@ -1,0 +1,3 @@
+// erreur attendue : abs attend 1 argument, pas 2
+var x : 1..3;
+constraint x = abs(1, 2);

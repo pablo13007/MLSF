@@ -1,0 +1,3 @@
+// erreur attendue : 'not' attend des booléens, pas un entier
+var x : 1..3;
+constraint not x;
